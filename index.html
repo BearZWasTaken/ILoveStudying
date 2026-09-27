@@ -6,15 +6,16 @@
   <meta name="theme-color" content="#fbf8f1">
   <title>I ❤️ Studying</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="game-layout.css">
 </head>
 <body>
   <svg class="icons" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <symbol id="icon-study" viewBox="0 0 32 32"><path d="M3 7h11l2 2 2-2h11v18H18l-2 2-2-2H3z" fill="#fff8d9" stroke="#415572" stroke-width="2"/><path d="M16 9v18M6 11h7M6 15h7M19 11h7M19 15h7" stroke="#7892b2" stroke-width="2"/></symbol>
-    <symbol id="icon-homework" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#fff9ed" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 14h11M11 19h11M11 24h7" stroke="#9faec4" stroke-width="2"/><path d="m20 23 2 2 5-6" fill="none" stroke="#e48790" stroke-width="2"/></symbol>
-    <symbol id="icon-quiz" viewBox="0 0 32 32"><rect x="5" y="4" width="22" height="25" fill="#eaf8fb" stroke="#435672" stroke-width="2"/><path d="M11 12c0-6 10-6 10 0 0 3-5 3-5 7M16 23v3" fill="none" stroke="#6f91b0" stroke-width="3"/></symbol>
-    <symbol id="icon-exam" viewBox="0 0 32 32"><path d="M5 7h22v21H5z" fill="#f4ebff" stroke="#435672" stroke-width="2"/><path d="M9 3h14v7H9z" fill="#e1cbf8" stroke="#435672" stroke-width="2"/><path d="M10 15h12M10 20h12M10 25h8" stroke="#9787b4" stroke-width="2"/></symbol>
-    <symbol id="icon-final" viewBox="0 0 32 32"><path d="M7 5h18v23H7z" fill="#ffe8e3" stroke="#435672" stroke-width="2"/><path d="M11 3h10v5H11z" fill="#ffbab0" stroke="#435672" stroke-width="2"/><path d="M11 14h10M11 19h10M11 24h7" stroke="#cb8187" stroke-width="2"/><path d="m22 23 3 3 4-6" fill="none" stroke="#d95e6e" stroke-width="2"/></symbol>
-    <symbol id="icon-grandFinal" viewBox="0 0 32 32"><path d="M7 11h18v17H7z" fill="#fff1c5" stroke="#435672" stroke-width="2"/><path d="m5 9 3-6 5 5 3-6 3 6 5-5 3 6-3 4H8z" fill="#f8d779" stroke="#435672" stroke-width="2"/><path d="M11 18h10M11 23h10" stroke="#bd945a" stroke-width="2"/></symbol>
+    <symbol id="icon-homework" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#fff9ed" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 13h11" stroke="#9faec4" stroke-width="2"/><path d="m13 18 3-2v9m-4 0h8" fill="none" stroke="#c88778" stroke-width="2"/></symbol>
+    <symbol id="icon-quiz" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#eaf8fb" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 13h11" stroke="#9faec4" stroke-width="2"/><path d="M12 17h8v4h-8v4h8" fill="none" stroke="#709eae" stroke-width="2"/></symbol>
+    <symbol id="icon-exam" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#f4ebff" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 13h11" stroke="#9faec4" stroke-width="2"/><path d="M12 17h8v8h-8m1-4h7" fill="none" stroke="#9c84b4" stroke-width="2"/></symbol>
+    <symbol id="icon-final" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#ffe8e3" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 13h11" stroke="#9faec4" stroke-width="2"/><path d="M12 17v5h8m0-5v8" fill="none" stroke="#ce8187" stroke-width="2"/></symbol>
+    <symbol id="icon-grandFinal" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#fff1c5" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 13h11" stroke="#9faec4" stroke-width="2"/><path d="M20 17h-8v4h8v4h-8" fill="none" stroke="#bb965f" stroke-width="2"/></symbol>
     <symbol id="icon-shield" viewBox="0 0 32 32"><path d="M16 3 28 8v8c0 7-5 11-12 14C9 27 4 23 4 16V8z" fill="#d9f0ef" stroke="#435672" stroke-width="2"/><path d="M16 7v18M8 14h16" stroke="#75aab0" stroke-width="2"/></symbol>
     <symbol id="icon-aiShield" viewBox="0 0 32 32"><path d="M16 3 28 8v8c0 7-5 11-12 14C9 27 4 23 4 16V8z" fill="#e8e5ff" stroke="#435672" stroke-width="2"/><path d="M11 12h10v10H11zM16 9v3M16 22v3M8 17h3M21 17h3" fill="#b5a8ef" stroke="#685d9a" stroke-width="2"/><path d="M14 16h4" stroke="#fff" stroke-width="2"/></symbol>
   </svg>
@@ -68,12 +69,12 @@
       <section id="game-screen" class="screen game-screen hidden" aria-label="Game">
         <div class="game-topline"><span id="round-number">ROUND 01</span><span id="room-role">ROOM</span><button id="leave-button" class="leave-button">Forfeit</button></div>
         <div class="arena panel">
-          <div class="player-block"><div class="player-label"><span class="avatar avatar-you">★</span><span id="game-your-name">YOU</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="your-gpa">0</strong> GPA</span><span id="your-lives" class="lives-stat"></span></div><div id="your-reveal" class="reveal-slot"></div></div>
-          <div class="versus">VS</div>
-          <div class="player-block opponent-block"><div class="player-label"><span class="avatar avatar-rival">✿</span><span id="game-opponent-name">OPPONENT</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="opponent-gpa">0</strong> GPA</span><span id="opponent-lives" class="lives-stat"></span></div><div id="opponent-reveal" class="reveal-slot"></div></div>
+          <div class="player-block"><div class="player-label"><span class="avatar avatar-you">★</span><span id="game-your-name">YOU</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="your-gpa">0</strong> GPA</span><span id="your-lives" class="lives-stat"></span></div></div>
+          <div class="duel-center"><div id="your-reveal" class="reveal-slot" aria-label="Your move"></div><span class="versus">VS</span><div id="opponent-reveal" class="reveal-slot" aria-label="Opponent move"></div></div>
+          <div class="player-block opponent-block"><div class="player-label"><span class="avatar avatar-rival">✿</span><span id="game-opponent-name">OPPONENT</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="opponent-gpa">0</strong> GPA</span><span id="opponent-lives" class="lives-stat"></span></div></div>
         </div>
         <div class="round-panel panel"><div class="round-header"><span id="phase-label">CHOOSE YOUR MOVE</span><span id="time-left">1.5s</span></div><div class="timer-track"><div id="timer-fill" class="timer-fill"></div></div><div class="current-move"><span>CURRENT MOVE</span><div id="selected-action" class="selected-action"></div></div></div>
-        <div class="moves-heading"><span>YOUR MOVES</span><span>CLICK OR USE KEYS</span></div>
+        <div class="moves-heading"><span>MOVES</span><span>Q · 1–5 · A · S</span></div>
         <div id="action-grid" class="action-grid"></div>
         <p id="game-message" class="game-message" role="status"></p>
       </section>

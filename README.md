@@ -17,6 +17,7 @@ PeerJS Cloud exchanges connection information when a guest enters a room code. M
 - Each round lasts **1.5 seconds** by default. The selected move can be changed until the timer ends. An untouched round uses **Study**.
 - **Study** (`Q`) earns 1 GPA.
 - **Homework**, **Quiz**, **Exam**, **Final**, **Grand Final** (`1`–`5`) cost and have power 1–5 respectively.
+- Attack icons are numbered papers. The number shows the attack's power; the cards show only GPA cost.
 - **Shield** (`A`) is free with defense 2. **AI-Shield** (`S`) costs 1 GPA with defense 4.
 - An attack beats Study, a weaker attack, or defense lower than its power. Every other pairing has no round winner. The loser loses one life.
 - Moves that cost more GPA than a player has are unavailable.

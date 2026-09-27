@@ -46,7 +46,10 @@ function icon(id) {
 function actionDisplay(id) {
   const wrap = document.createElement('span');
   wrap.className = 'selected-action';
-  wrap.append(icon(id), document.createTextNode(ACTIONS[id].name));
+  const name = document.createElement('span');
+  name.className = 'selected-name';
+  name.textContent = ACTIONS[id].name;
+  wrap.append(icon(id), name);
   return wrap;
 }
 
@@ -390,18 +393,28 @@ function clearReveals() {
   for (const id of ['your-reveal', 'opponent-reveal']) {
     $(id).replaceChildren(document.createTextNode('?'));
     $(id).className = 'reveal-slot';
+    $(id).setAttribute('aria-label', id === 'your-reveal' ? 'Your move hidden' : 'Opponent move hidden');
   }
 }
 
 function reveal(elementId, actionId, result) {
-  $(elementId).replaceChildren(icon(actionId), document.createTextNode(ACTIONS[actionId].name));
+  $(elementId).replaceChildren(icon(actionId));
   $(elementId).className = `reveal-slot ${result}`;
+  $(elementId).setAttribute('aria-label', `${elementId === 'your-reveal' ? 'Your' : 'Opponent'} move: ${ACTIONS[actionId].name}`);
 }
 
 function drawActions() {
   const grid = $('action-grid');
   grid.replaceChildren();
-  for (const id of ACTION_IDS) {
+  const layout = ['study', null, null, 'shield', 'aiShield', 'homework', 'quiz', 'exam', 'final', 'grandFinal'];
+  for (const id of layout) {
+    if (id === null) {
+      const empty = document.createElement('div');
+      empty.className = 'action-empty';
+      empty.setAttribute('aria-hidden', 'true');
+      grid.append(empty);
+      continue;
+    }
     const action = ACTIONS[id];
     const button = document.createElement('button');
     button.type = 'button';
@@ -416,8 +429,14 @@ function drawActions() {
     name.textContent = action.name;
     const meta = document.createElement('span');
     meta.className = `action-meta ${action.kind === 'study' ? 'gain' : action.cost ? 'cost' : 'defense'}`;
-    meta.textContent = action.kind === 'study' ? '+1 GPA' : action.kind === 'attack' ? `−${action.cost} GPA · PWR ${action.power}` : action.cost ? `−${action.cost} GPA · DEF ${action.defense}` : `FREE · DEF ${action.defense}`;
+    meta.textContent = action.kind === 'study' ? '+1 GPA' : action.kind === 'attack' ? `−${action.cost} GPA` : action.cost ? `−${action.cost} GPA` : `DEF ${action.defense}`;
     info.append(name, meta);
+    if (id === 'aiShield') {
+      const defense = document.createElement('span');
+      defense.className = 'action-defense';
+      defense.textContent = `DEF ${action.defense}`;
+      info.append(defense);
+    }
     const key = document.createElement('span');
     key.className = 'keycap';
     key.textContent = action.key;
