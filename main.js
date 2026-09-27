@@ -1,5 +1,5 @@
 import { ACTIONS, ACTION_IDS, canUse, resolveRound } from './game.js';
-import { PeerLink } from './peer.js';
+import { RoomLink } from './link.js';
 
 const $ = (id) => document.getElementById(id);
 const screens = ['home-screen', 'lobby-screen', 'game-screen', 'result-screen', 'records-screen'];
@@ -107,7 +107,7 @@ function openLobby(asHost) {
   updateReadyUi();
 
   if (asHost) try {
-    link = new PeerLink(handleMessage, handleStatus);
+    link = new RoomLink(handleMessage, handleStatus);
     const creatingLink = link;
     creatingLink.createRoom().then((code) => {
       if (link !== creatingLink) return;
@@ -174,13 +174,17 @@ async function connect() {
   $('connect-button').disabled = true;
   setText('connection-message', 'Connecting...');
   $('connection-message').classList.remove('success');
+  let joiningLink;
   try {
     link?.close();
-    link = new PeerLink(handleMessage, handleStatus);
-    await link.joinRoom($('room-code-input').value);
-    roomCode = link.code;
+    joiningLink = new RoomLink(handleMessage, handleStatus);
+    link = joiningLink;
+    await joiningLink.joinRoom($('room-code-input').value);
+    if (link !== joiningLink) return;
+    roomCode = joiningLink.code;
   } catch (error) {
-    link?.close();
+    if (link !== joiningLink) return;
+    joiningLink.close();
     link = null;
     setText('connection-message', error.message);
     $('connect-button').disabled = false;
@@ -188,6 +192,10 @@ async function connect() {
 }
 
 function handleStatus(status, detail) {
+  if (status === 'fallback') {
+    setText('connection-message', 'Trying direct connection...');
+    return;
+  }
   if (status === 'incoming') {
     setText('connection-message', 'Opponent found. Connecting...');
     return;
@@ -195,7 +203,7 @@ function handleStatus(status, detail) {
   if (status === 'connected') {
     $('connection-pill').classList.add('online');
     setText('connection-pill', 'CONNECTED');
-    setText('connection-message', 'Connected!');
+    setText('connection-message', detail === 'relay' ? 'Connected via relay.' : 'Connected directly.');
     $('connection-message').classList.add('success');
     if (role === 'guest') $('room-code-input').disabled = true;
     link?.send({ type: 'hello', name: ownName });

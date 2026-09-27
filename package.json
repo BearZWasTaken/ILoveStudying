@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node game.test.js && node turn.test.js && node peer.test.js"
+    "test": "node game.test.js && node turn.test.js && node peer.test.js && node relay.test.js && node link.test.js"
   }
 }

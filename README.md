@@ -1,6 +1,6 @@
 # I ❤️ Studying
 
-A two-player, real-time browser game built as a static site. GitHub Pages can host the files directly. No application server, account, build step, or package install is required. Room codes use the free PeerJS Cloud signaling service to connect browsers.
+A two-player, real-time browser game built as a static site. GitHub Pages can host the files directly. No server run by you, account, build step, or package install is required. Room codes use a public WebSocket relay, with PeerJS direct connection as a fallback.
 
 ## Play
 
@@ -10,11 +10,11 @@ A two-player, real-time browser game built as a static site. GitHub Pages can ho
 4. Both players select **Ready**. The host can change the round time and lives; changing either setting clears both ready states. Once both are ready, the host starts the match.
 5. After the match, both players can return to the same room and get ready for another game. The room code, names, and settings remain in place while the host keeps the room open.
 
-PeerJS Cloud exchanges connection information when a guest enters a room code. Moves then travel over a WebRTC data channel. The game uses Google's and Cloudflare's public STUN services to help establish a direct connection. The game relies on the availability of PeerJS Cloud and a CDN for the PeerJS browser library. Some restrictive networks cannot make a direct connection. The optional TURN configuration below can relay those connections; it is disabled by default.
+The game first connects both players to the same room channel on [Websocket Router](https://router.metapage.io/). Messages travel through that public service over encrypted WebSockets, so players on different networks do not need a direct WebRTC path. The service requires no account or API key and stores no messages, but its operators can see room messages while relaying them. The game adds acknowledgements and retries for messages sent while both players are connected, plus heartbeats to detect disconnection. If the WebSocket service cannot be reached, the game tries its earlier PeerJS direct connection path. PeerJS Cloud handles signaling, and Google's and Cloudflare's public STUN servers help establish that direct connection. A public relay can still go offline or lose messages; unexpected loss ends the match as unresolved and saves the rounds completed locally.
 
 ## Optional TURN relay
 
-TURN may help when two networks cannot connect directly, but a timeout alone does not prove that TURN is needed. The guest's connection error displays the browser's ICE state, and the host displays **Opponent found. Connecting...** when the connection request reaches it.
+TURN can help the PeerJS fallback when two networks cannot connect directly. The guest's direct-connection error displays the browser's ICE and relay states, and the host displays **Opponent found. Connecting...** when a connection request reaches it.
 
 To use a TURN provider, set `TURN_CREDENTIALS_URL` in `turn-config.js` to an HTTPS endpoint returning an `iceServers` array or `{ "iceServers": [...] }`. Each TURN entry needs `urls`, `username`, and `credential`. Both players load the same published configuration. If the endpoint fails or returns no valid TURN entries, the game uses its original STUN-only connection path. Never put permanent private TURN credentials in this public repository.
 

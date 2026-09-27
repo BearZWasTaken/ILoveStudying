@@ -10,7 +10,7 @@ export function normalizeRoomCode(value) {
   return /^[A-HJ-NP-Z2-9]{6}$/.test(code) ? code : null;
 }
 
-function randomRoomCode() {
+export function randomRoomCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return Array.from(bytes, (byte) => ALPHABET[byte & 31]).join('');
 }
@@ -76,12 +76,12 @@ export class PeerLink {
     return window.Peer;
   }
 
-  async createRoom() {
+  async createRoom(preferredCode = null) {
     const Peer = this.peerConstructor();
     const options = await peerOptions();
     this.isHost = true;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const code = randomRoomCode();
+    for (let attempt = 0; attempt < (preferredCode ? 1 : 5); attempt += 1) {
+      const code = preferredCode || randomRoomCode();
       const peer = new Peer(roomPeerId(code), options);
       try {
         await waitForOpen(peer);
