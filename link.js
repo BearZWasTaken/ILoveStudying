@@ -46,7 +46,8 @@ export class RoomLink {
     if (status === 'incoming' && (!this.active || this.active === source)) {
       this.onStatus('incoming');
     } else if (source === this.active) {
-      if (status === 'disconnected') this.connected = false;
+      if (status === 'disconnected' || status === 'left' || status === 'reconnecting') this.connected = false;
+      if (status === 'resumed') this.connected = true;
       this.onStatus(status, detail);
     }
   }
@@ -92,6 +93,10 @@ export class RoomLink {
   }
 
   send(message) { return this.active?.send(message) || false; }
+
+  get recovering() { return this.relay?.recovering === true; }
+
+  wake() { this.relay?.wake(); }
 
   close() {
     this.closed = true;

@@ -10,7 +10,7 @@ A two-player, real-time browser game built as a static site. GitHub Pages can ho
 4. Both players select **Ready**. The host can change the round time and lives; changing either setting clears both ready states. Once both are ready, the host starts the match.
 5. After the match, both players can return to the same room and get ready for another game. The room code, names, and settings remain in place while the host keeps the room open.
 
-The game first connects both players to the same room channel on [Websocket Router](https://router.metapage.io/). Messages travel through that public service over encrypted WebSockets, so players on different networks do not need a direct WebRTC path. The service requires no account or API key and stores no messages, but its operators can see room messages while relaying them. The game adds acknowledgements and retries for messages sent while both players are connected, plus heartbeats to detect disconnection. If the WebSocket service cannot be reached, the game tries its earlier PeerJS direct connection path. PeerJS Cloud handles signaling, and Google's and Cloudflare's public STUN servers help establish that direct connection. A public relay can still go offline or lose messages; unexpected loss ends the match as unresolved and saves the rounds completed locally.
+The game first connects both players to the same room channel on [Websocket Router](https://router.metapage.io/). Messages travel through that public service over encrypted WebSockets, so players on different networks do not need a direct WebRTC path. The service requires no account or API key and stores no messages, but its operators can see room messages while relaying them. The game adds acknowledgements and retries, detects a stalled connection, and attempts to reconnect for up to one minute. Returning to a backgrounded tab also triggers a connection check. If the WebSocket service cannot be reached when joining, the game tries its PeerJS direct connection path. PeerJS Cloud handles signaling, and public STUN servers help establish that direct connection. A public relay can still go offline or lose messages; a match that cannot recover ends as unresolved and saves its completed rounds locally.
 
 ## Optional TURN relay
 
@@ -18,13 +18,10 @@ TURN can help the PeerJS fallback when two networks cannot connect directly. The
 
 To use a TURN provider, set `TURN_CREDENTIALS_URL` in `turn-config.js` to an HTTPS endpoint returning an `iceServers` array or `{ "iceServers": [...] }`. Each TURN entry needs `urls`, `username`, and `credential`. Both players load the same published configuration. If the endpoint fails or returns no valid TURN entries, the game uses its original STUN-only connection path. Never put permanent private TURN credentials in this public repository.
 
-[Metered Open Relay](https://www.metered.ca/tools/openrelay/) currently offers a free account with 20 GB of TURN usage per month and documents a browser-fetchable credentials endpoint. You must create your own account and set its endpoint URL; no account or key is included in this repository. Check the provider's current quota and billing settings before enabling it. GitHub Pages continues to host only the static game files.
-
-For Metered Open Relay, its documented endpoint has the form `https://YOUR_APP.metered.live/api/v1/turn/credentials?apiKey=YOUR_API_KEY`. Put your own endpoint in `turn-config.js` and publish that file with the rest of the site. Since GitHub Pages is public, this URL and its API key will be visible to visitors; use a dedicated free account and do not use a key with access to unrelated projects.
-
 ## Rules
 
 - Each round lasts **1.5 seconds** by default. The selected move can be changed until the timer ends. An untouched round uses **Study**.
+- Both players get a full countdown after a round-start handshake. The selected move is submitted when its countdown ends, and the round is revealed only after both submissions arrive. Network delay may add a short syncing or waiting period between rounds.
 - **Study** (`Q`) earns 1 GPA.
 - **Homework**, **Quiz**, **Exam**, **Final**, **Grand Final** (`1`–`5`) cost and have power 1–5 respectively.
 - Attack icons are numbered papers. The number shows the attack's power; the cards show only GPA cost.

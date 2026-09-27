@@ -22,7 +22,9 @@ let nextTimer = 0;
 let match = null;
 let viewingRecord = null;
 let terminalWinner = null;
-let hostWaitingForChoice = false;
+let roundActive = false;
+let awaitingReadyRound = 0;
+let remoteCommitted = false;
 let ownName = 'Anonymous';
 let opponentName = 'Opponent';
 let localReady = false;
@@ -62,7 +64,9 @@ function resetConnection() {
   role = null;
   phase = 'home';
   terminalWinner = null;
-  hostWaitingForChoice = false;
+  roundActive = false;
+  awaitingReadyRound = 0;
+  remoteCommitted = false;
   localReady = false;
   remoteReady = false;
   roomCode = null;
@@ -192,6 +196,27 @@ async function connect() {
 }
 
 function handleStatus(status, detail) {
+  if (status === 'reconnecting') {
+    $('connection-pill').classList.remove('online');
+    setText('connection-pill', 'RECONNECTING');
+    setText('connection-message', 'Reconnecting...');
+    $('connection-message').classList.remove('success');
+    if (phase === 'lobby') updateReadyUi();
+    return;
+  }
+  if (status === 'resumed') {
+    $('connection-pill').classList.add('online');
+    setText('connection-pill', 'CONNECTED');
+    setText('connection-message', 'Connected via relay.');
+    $('connection-message').classList.add('success');
+    if (phase === 'lobby') updateReadyUi();
+    return;
+  }
+  if (status === 'room-ready') {
+    setText('connection-pill', 'OFFLINE');
+    setText('connection-message', 'Room ready. Waiting for opponent.');
+    return;
+  }
   if (status === 'fallback') {
     setText('connection-message', 'Trying direct connection...');
     return;
@@ -237,16 +262,26 @@ function handleStatus(status, detail) {
   setText('connection-pill', 'OFFLINE');
   if (phase === 'game' || phase === 'reveal') {
     if (terminalWinner !== null) finish('lives', terminalWinner);
+    else if (status === 'left') finish('opponent-left', 0);
     else finish('disconnect', null);
   } else if (phase === 'lobby') {
     opponentName = 'Opponent';
     setText('lobby-opponent-name', opponentName);
     resetReady(false);
-    setText('connection-message', role === 'host' ? 'Opponent left. Room is still open.' : 'Host left the room.');
+    const message = status === 'left'
+      ? (role === 'host' ? 'Opponent left. Room is still open.' : 'Host left the room.')
+      : (role === 'host' ? 'Connection lost. Room is still open.' : 'Connection lost. Rejoin with the same code.');
+    setText('connection-message', message);
     $('connection-message').classList.remove('success');
     if (role === 'guest') {
       $('room-code-input').disabled = false;
       $('connect-button').disabled = false;
+      if (status === 'disconnected' && roomCode) {
+        const oldLink = link;
+        setTimeout(() => {
+          if (link === oldLink && phase === 'lobby' && !link.connected && !document.hidden) connect();
+        }, 1000);
+      }
     }
   }
 }
@@ -283,9 +318,23 @@ function handleMessage(message) {
     settings = { roundTime, lives };
     beginMatch();
   } else if (message.type === 'round-start' && role === 'guest' && (phase === 'game' || phase === 'reveal')) {
-    if (message.round === round + 1) beginRound();
-  } else if (message.type === 'choice' && role === 'host' && (phase === 'game' || hostWaitingForChoice) && message.round === round && canUse(message.action, players[1].gpa)) {
+    if (message.round === round + 1 && !awaitingReadyRound) {
+      awaitingReadyRound = message.round;
+      showRoundSync();
+      link?.send({ type: 'round-ready', round: message.round });
+      roundTimer = setTimeout(() => finish('disconnect', null), 15000);
+    }
+  } else if (message.type === 'round-ready' && role === 'host' && message.round === awaitingReadyRound && awaitingReadyRound === round + 1) {
+    awaitingReadyRound = 0;
+    link?.send({ type: 'round-go', round: message.round });
+    beginRound();
+  } else if (message.type === 'round-go' && role === 'guest' && message.round === awaitingReadyRound && awaitingReadyRound === round + 1) {
+    awaitingReadyRound = 0;
+    beginRound();
+  } else if (message.type === 'round-choice' && role === 'host' && !remoteCommitted && (phase === 'game' || phase === 'reveal') && message.round === round && canUse(message.action, players[1].gpa)) {
     remoteChoice = message.action;
+    remoteCommitted = true;
+    if (phase === 'reveal' && !roundActive) resolveAsHost();
   } else if (message.type === 'round-result' && role === 'guest' && (phase === 'game' || phase === 'reveal') && message.round === round) {
     acceptResult(message);
   } else if (message.type === 'leave' && (phase === 'game' || phase === 'reveal')) {
@@ -296,6 +345,9 @@ function handleMessage(message) {
 function beginMatch() {
   phase = 'game';
   round = 0;
+  roundActive = false;
+  awaitingReadyRound = 0;
+  remoteCommitted = false;
   players = [{ gpa: 0, lives: settings.lives }, { gpa: 0, lives: settings.lives }];
   match = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), settings: { ...settings }, role, roomCode, players: [ownName, opponentName], rounds: [], outcome: null, reason: null };
   terminalWinner = null;
@@ -305,23 +357,40 @@ function beginMatch() {
   show('game-screen');
   drawStats();
   clearReveals();
+  showRoundSync();
   if (role === 'host') startRoundFromHost();
 }
 
 function startRoundFromHost() {
   if (phase !== 'game' && phase !== 'reveal') return;
+  clearTimeout(roundTimer);
+  roundActive = false;
+  awaitingReadyRound = round + 1;
+  showRoundSync();
   link?.send({ type: 'round-start', round: round + 1 });
-  beginRound();
+  roundTimer = setTimeout(() => finish('disconnect', null), 15000);
+}
+
+function showRoundSync() {
+  chosen = 'study';
+  setText('round-number', `ROUND ${String(round + 1).padStart(2, '0')}`);
+  setText('phase-label', 'SYNCING ROUND...');
+  setText('time-left', '—');
+  setText('game-message', '');
+  $('timer-fill').style.width = '0%';
+  clearReveals();
+  drawActions();
 }
 
 function beginRound() {
   clearTimeout(roundTimer);
   clearTimeout(nextTimer);
   phase = 'game';
+  roundActive = true;
   round += 1;
   chosen = 'study';
   remoteChoice = 'study';
-  hostWaitingForChoice = false;
+  remoteCommitted = false;
   deadline = performance.now() + settings.roundTime * 1000;
   setText('round-number', `ROUND ${String(round).padStart(2, '0')}`);
   setText('phase-label', 'CHOOSE YOUR MOVE');
@@ -330,13 +399,17 @@ function beginRound() {
   drawActions();
   tick();
   roundTimer = setTimeout(() => {
+    roundActive = false;
     phase = 'reveal';
-    setText('phase-label', 'REVEALING...');
+    cancelAnimationFrame(timerFrame);
+    setText('time-left', '0.0s');
+    $('timer-fill').style.width = '0%';
+    setText('phase-label', 'WAITING FOR OPPONENT...');
     drawActions();
     if (role === 'host') {
-      hostWaitingForChoice = true;
-      roundTimer = setTimeout(resolveAsHost, 170);
-    }
+      if (remoteCommitted) resolveAsHost();
+      else roundTimer = setTimeout(() => finish('disconnect', null), 15000);
+    } else link?.send({ type: 'round-choice', round, action: chosen });
   }, settings.roundTime * 1000);
 }
 
@@ -346,21 +419,20 @@ function tick() {
     const left = Math.max(0, deadline - performance.now());
     setText('time-left', `${(left / 1000).toFixed(1)}s`);
     $('timer-fill').style.width = `${(left / (settings.roundTime * 1000)) * 100}%`;
-    if (left > 0 && phase === 'game') timerFrame = requestAnimationFrame(frame);
+    if (left > 0 && roundActive) timerFrame = requestAnimationFrame(frame);
   }
   frame();
 }
 
 function selectAction(id) {
-  if (phase !== 'game' || !canUse(id, players[0].gpa)) return;
+  if (!roundActive || performance.now() >= deadline || !canUse(id, players[0].gpa)) return;
   chosen = id;
   drawActions();
-  if (role === 'guest') link?.send({ type: 'choice', round, action: id });
 }
 
 function resolveAsHost() {
-  if (phase !== 'reveal') return;
-  hostWaitingForChoice = false;
+  if (role !== 'host' || phase !== 'reveal' || roundActive || !remoteCommitted) return;
+  clearTimeout(roundTimer);
   const actions = [chosen, remoteChoice];
   const result = resolveRound(players, actions);
   link?.send({ type: 'round-result', round, actions, players: result.players, winner: result.winner });
@@ -432,7 +504,7 @@ function drawActions() {
     button.type = 'button';
     button.className = `action-card${chosen === id ? ' selected' : ''}`;
     button.setAttribute('aria-pressed', String(chosen === id));
-    button.disabled = phase !== 'game' || !canUse(id, players[0].gpa);
+    button.disabled = !roundActive || !canUse(id, players[0].gpa);
     button.setAttribute('aria-label', `${action.name}, ${action.kind === 'study' ? 'plus 1 GPA' : action.cost ? `minus ${action.cost} GPA` : 'free'}, key ${action.key}`);
     const info = document.createElement('span');
     info.className = 'action-info';
@@ -488,7 +560,9 @@ function finish(reason, winner) {
   clearTimeout(nextTimer);
   cancelAnimationFrame(timerFrame);
   phase = 'result';
-  hostWaitingForChoice = false;
+  roundActive = false;
+  awaitingReadyRound = 0;
+  remoteCommitted = false;
   match.reason = reason;
   match.outcome = winner === 0 ? 'win' : winner === 1 ? 'loss' : 'unresolved';
   saveMatch();
@@ -611,3 +685,9 @@ document.addEventListener('keydown', (event) => {
   if (actionId) selectAction(actionId);
 });
 window.addEventListener('beforeunload', () => { if (phase === 'game' || phase === 'reveal') link?.send({ type: 'leave' }); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (roundActive) tick();
+  if (role === 'guest' && phase === 'lobby' && roomCode && link && !link.connected && !link.recovering) connect();
+  else link?.wake();
+});

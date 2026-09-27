@@ -4,7 +4,8 @@ const RELAY_URL = 'wss://router.metapage.io/ils-room-';
 const PROTOCOL = 1;
 const JOIN_TIMEOUT_MS = 6000;
 const HEARTBEAT_MS = 1200;
-const LOST_MS = 6500;
+const LOST_MS = 10000;
+const RECOVERY_MS = 60000;
 const RETRY_MS = 500;
 
 export class RelayLink {
@@ -17,19 +18,23 @@ export class RelayLink {
     this.isHost = false;
     this.connected = false;
     this.closed = false;
+    this.recovering = false;
     this.remoteId = null;
+    this.previousRemoteId = null;
     this.lastSeen = 0;
     this.sequence = 0;
     this.expected = 1;
     this.pending = new Map();
     this.received = new Map();
-    this.beaconTimer = null;
     this.joinTimer = null;
     this.heartbeatTimer = null;
     this.retryTimer = null;
     this.joinTimeout = null;
     this.joinResolve = null;
     this.joinReject = null;
+    this.reconnectTimer = null;
+    this.recoveryTimer = null;
+    this.reconnectDelay = 500;
   }
 
   async createRoom(value) {
@@ -38,8 +43,6 @@ export class RelayLink {
     this.code = code;
     this.isHost = true;
     await this.openSocket();
-    this.beaconTimer = setInterval(() => this.rawSend({ type: 'host', id: this.id }), 1200);
-    this.rawSend({ type: 'host', id: this.id });
     return code;
   }
 
@@ -67,16 +70,16 @@ export class RelayLink {
         settled = true;
         socket.close();
         reject(new Error('Could not reach the room service.'));
-      }, 8000);
+      }, this.recovering ? 4000 : 8000);
       socket.onopen = () => {
         if (settled || this.closed) return;
         settled = true;
         clearTimeout(timeout);
-        this.heartbeatTimer = setInterval(() => this.heartbeat(), HEARTBEAT_MS);
-        this.retryTimer = setInterval(() => this.retryPending(), RETRY_MS);
+        if (!this.heartbeatTimer) this.heartbeatTimer = setInterval(() => this.heartbeat(), HEARTBEAT_MS);
+        if (!this.retryTimer) this.retryTimer = setInterval(() => this.retryPending(), RETRY_MS);
         resolve();
       };
-      socket.onmessage = (event) => this.receive(event.data);
+      socket.onmessage = (event) => { if (this.socket === socket) this.receive(event.data); };
       socket.onerror = () => {
         if (settled) return;
         settled = true;
@@ -88,9 +91,10 @@ export class RelayLink {
         if (!settled) {
           settled = true;
           reject(new Error('Could not reach the room service.'));
-        } else if (!this.closed) {
+        } else if (!this.closed && this.socket === socket) {
           this.failJoin(new Error('Connection service unavailable.'));
-          this.drop('service-error');
+          if (this.connected || this.isHost) this.startRecovery();
+          else this.onStatus('service-error');
         }
       };
     });
@@ -104,31 +108,98 @@ export class RelayLink {
     } catch { return false; }
   }
 
+  startRecovery() {
+    if (this.closed) return;
+    if (!this.recovering) {
+      this.recovering = true;
+      this.reconnectDelay = 500;
+      this.onStatus('reconnecting');
+      this.recoveryTimer = setTimeout(() => {
+        if (!this.recovering) return;
+        this.recovering = false;
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+        this.drop();
+      }, RECOVERY_MS);
+    }
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.close();
+    this.scheduleReconnect();
+  }
+
+  scheduleReconnect() {
+    if (this.closed || !this.recovering || this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      if (this.closed || !this.recovering) return;
+      try {
+        await this.openSocket();
+        if (this.closed || !this.recovering) return;
+        if (this.remoteId) this.rawSend({ type: 'probe', from: this.id, to: this.remoteId });
+        else this.finishRecovery();
+      } catch {
+        if (!this.closed && this.recovering) {
+          this.reconnectDelay = Math.min(this.reconnectDelay * 2, 3000);
+          this.scheduleReconnect();
+        }
+      }
+    }, this.reconnectDelay);
+  }
+
+  finishRecovery() {
+    if (!this.recovering) return;
+    this.recovering = false;
+    clearTimeout(this.recoveryTimer);
+    clearTimeout(this.reconnectTimer);
+    this.recoveryTimer = null;
+    this.reconnectTimer = null;
+    this.lastSeen = Date.now();
+    if (this.connected) {
+      this.onStatus('resumed');
+      for (const pending of this.pending.values()) {
+        pending.lastSent = Date.now();
+        this.rawSend(pending.message);
+      }
+    } else if (this.isHost) this.onStatus('room-ready');
+  }
+
   receive(raw) {
     let message;
     try { message = JSON.parse(raw); } catch { return; }
     if (message?.v !== PROTOCOL || typeof message.type !== 'string') return;
-    if (this.isHost && message.type === 'join' && typeof message.id === 'string') {
-      if (this.remoteId && this.remoteId !== message.id) {
-        this.rawSend({ type: 'full', to: message.id });
+    const joiningId = message.type === 'join' ? message.id : message.type === 'probe' && !this.remoteId && message.to === this.id ? message.from : null;
+    if (this.isHost && typeof joiningId === 'string') {
+      if (this.remoteId && this.remoteId !== joiningId) {
+        this.rawSend({ type: 'full', to: joiningId });
       } else {
-        if (!this.remoteId) this.onStatus('incoming');
-        this.remoteId = message.id;
-        this.rawSend({ type: 'welcome', to: message.id, id: this.id });
+        if (!this.remoteId) {
+          if (this.previousRemoteId !== joiningId) {
+            this.sequence = 0;
+            this.expected = 1;
+            this.received.clear();
+          }
+          this.previousRemoteId = null;
+          this.onStatus('incoming');
+        }
+        this.remoteId = joiningId;
+        this.rawSend({ type: 'welcome', to: joiningId, id: this.id });
+        this.finishRecovery();
         if (!this.connected) this.setConnected();
       }
       return;
     }
     if (!this.isHost && message.type === 'welcome' && message.to === this.id && typeof message.id === 'string') {
       if (this.remoteId && this.remoteId !== message.id) return;
+      const stale = this.connected && Date.now() - this.lastSeen > LOST_MS;
       this.remoteId = message.id;
+      this.lastSeen = Date.now();
+      this.finishRecovery();
       if (!this.connected) {
         this.setConnected();
         this.clearJoin();
         this.joinResolve?.(this.code);
         this.joinResolve = null;
         this.joinReject = null;
-      }
+      } else if (stale) this.onStatus('connected');
       return;
     }
     if (!this.isHost && message.type === 'full' && message.to === this.id) {
@@ -138,7 +209,12 @@ export class RelayLink {
     if (!this.remoteId || message.from !== this.remoteId || message.to !== this.id) return;
     this.lastSeen = Date.now();
     if (message.type === 'bye') {
-      this.drop('disconnected');
+      this.drop('left');
+      return;
+    }
+    this.finishRecovery();
+    if (message.type === 'probe') {
+      this.rawSend({ type: 'probe-ack', from: this.id, to: this.remoteId });
     } else if (message.type === 'data' && Number.isSafeInteger(message.seq) && message.seq > 0) {
       this.rawSend({ type: 'ack', from: this.id, to: this.remoteId, seq: message.seq });
       if (message.seq >= this.expected && message.seq < this.expected + 64 && !this.received.has(message.seq)) {
@@ -162,13 +238,17 @@ export class RelayLink {
   }
 
   heartbeat() {
+    if (this.recovering) {
+      if (this.remoteId) this.rawSend({ type: 'probe', from: this.id, to: this.remoteId });
+      return;
+    }
     if (!this.connected) return;
-    if (Date.now() - this.lastSeen > LOST_MS) { this.drop('disconnected'); return; }
+    if (Date.now() - this.lastSeen > LOST_MS) { this.startRecovery(); return; }
     this.rawSend({ type: 'heartbeat', from: this.id, to: this.remoteId });
   }
 
   retryPending() {
-    if (!this.connected) return;
+    if (!this.connected || this.recovering) return;
     const now = Date.now();
     for (const pending of this.pending.values()) {
       if (now - pending.lastSent < RETRY_MS) continue;
@@ -182,20 +262,38 @@ export class RelayLink {
     const seq = ++this.sequence;
     const message = { type: 'data', from: this.id, to: this.remoteId, seq, payload };
     this.pending.set(seq, { message, lastSent: Date.now() });
-    this.rawSend(message);
+    if (!this.recovering) this.rawSend(message);
     return true;
   }
 
-  drop(status) {
+  wake() {
+    if (this.closed) return;
+    if (this.recovering) {
+      if (this.socket?.readyState === WebSocket.OPEN && this.remoteId) {
+        this.rawSend({ type: 'probe', from: this.id, to: this.remoteId });
+      }
+      return;
+    }
+    if (this.socket?.readyState !== WebSocket.OPEN) {
+      if (this.isHost || this.connected) this.startRecovery();
+    } else if (this.remoteId) {
+      this.rawSend({ type: 'probe', from: this.id, to: this.remoteId });
+    }
+  }
+
+  drop(status = 'disconnected') {
     const wasConnected = this.connected;
+    this.recovering = false;
+    clearTimeout(this.recoveryTimer);
+    clearTimeout(this.reconnectTimer);
+    this.recoveryTimer = null;
+    this.reconnectTimer = null;
     this.connected = false;
+    this.previousRemoteId = this.remoteId;
     this.remoteId = null;
     this.pending.clear();
     this.received.clear();
-    this.sequence = 0;
-    this.expected = 1;
-    if (wasConnected) this.onStatus('disconnected');
-    else if (status === 'service-error') this.onStatus('service-error');
+    if (wasConnected) this.onStatus(status);
   }
 
   clearJoin() {
@@ -219,9 +317,10 @@ export class RelayLink {
     this.closed = true;
     this.failJoin(new Error('Connection cancelled.'));
     this.clearJoin();
-    clearInterval(this.beaconTimer);
     clearInterval(this.heartbeatTimer);
     clearInterval(this.retryTimer);
+    clearTimeout(this.recoveryTimer);
+    clearTimeout(this.reconnectTimer);
     this.socket?.close();
     this.socket = null;
     this.connected = false;

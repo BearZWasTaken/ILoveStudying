@@ -26,6 +26,17 @@ assert.equal(guest.connected, true);
 assert.deepEqual(statuses, [['fallback', undefined], ['connected', 'direct']]);
 assert.equal(guest.send({ type: 'hello' }), true);
 
+const recoveryStatuses = [];
+const recovering = new RoomLink(() => {}, (status) => recoveryStatuses.push(status));
+recovering.relay = { close() {} };
+recovering.active = recovering.relay;
+recovering.connected = true;
+recovering.handleStatus(recovering.relay, 'reconnecting');
+assert.equal(recovering.connected, false);
+recovering.handleStatus(recovering.relay, 'resumed');
+assert.equal(recovering.connected, true);
+assert.deepEqual(recoveryStatuses, ['reconnecting', 'resumed']);
+
 guest.close();
 host.close();
 RelayLink.prototype.createRoom = relayCreate;
