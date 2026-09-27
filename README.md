@@ -20,6 +20,8 @@ To use a TURN provider, set `TURN_CREDENTIALS_URL` in `turn-config.js` to an HTT
 
 [Metered Open Relay](https://www.metered.ca/tools/openrelay/) currently offers a free account with 20 GB of TURN usage per month and documents a browser-fetchable credentials endpoint. You must create your own account and set its endpoint URL; no account or key is included in this repository. Check the provider's current quota and billing settings before enabling it. GitHub Pages continues to host only the static game files.
 
+For Metered Open Relay, its documented endpoint has the form `https://YOUR_APP.metered.live/api/v1/turn/credentials?apiKey=YOUR_API_KEY`. Put your own endpoint in `turn-config.js` and publish that file with the rest of the site. Since GitHub Pages is public, this URL and its API key will be visible to visitors; use a dedicated free account and do not use a key with access to unrelated projects.
+
 ## Rules
 
 - Each round lasts **1.5 seconds** by default. The selected move can be changed until the timer ends. An untouched round uses **Study**.
