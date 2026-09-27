@@ -66,12 +66,17 @@ export class PeerLink {
 
   listenForGuests() {
     this.peer.on('connection', (channel) => {
-      if (this.channel) {
+      if (this.channel && this.connected) {
         channel.on('open', () => {
           channel.send({ type: 'room-full' });
           setTimeout(() => channel.close(), 150);
         });
         return;
+      }
+      if (this.channel) {
+        clearTimeout(this.hostPendingTimeout);
+        this.channel.close();
+        this.channel = null;
       }
       this.onStatus('incoming');
       this.attach(channel);
