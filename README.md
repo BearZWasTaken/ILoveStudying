@@ -21,10 +21,11 @@ To use a TURN provider, set `TURN_CREDENTIALS_URL` in `turn-config.js` to an HTT
 ## Rules
 
 - Each round lasts **1.5 seconds** by default. The selected move can be changed until the timer ends. An untouched round uses **Study**.
-- Both players get a full countdown after a round-start handshake. The selected move is submitted when its countdown ends, and the round is revealed only after both submissions arrive. Network delay may add a short syncing or waiting period between rounds.
+- The host starts its countdown when it announces the round; the guest starts on receipt. Both get the full selection time. The guest submits its final move when its countdown ends, and the host reveals the round after both countdowns and the guest's submission. Network delay may add a waiting period before the reveal.
 - **Study** (`Q`) earns 1 GPA.
 - **Homework**, **Quiz**, **Exam**, **Final**, **Grand Final** (`1`–`5`) cost and have power 1–5 respectively.
 - Attack icons are numbered papers. The number shows the attack's power; the cards show only GPA cost.
+- The game UI shows move icons, costs, defense, and keys without move names. Round history shows each player's post-round GPA and marks a lost life with **-❤️**.
 - **Shield** (`A`) is free with defense 2. **AI-Shield** (`S`) costs 1 GPA with defense 4.
 - An attack beats Study, a weaker attack, or defense lower than its power. Every other pairing has no round winner. The loser loses one life.
 - Moves that cost more GPA than a player has are unavailable.

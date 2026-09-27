@@ -1,12 +1,12 @@
 export const ACTIONS = Object.freeze({
-  study: { name: 'Study', key: 'Q', kind: 'study', cost: 0, power: 0, defense: 0 },
-  homework: { name: 'Homework', key: '1', kind: 'attack', cost: 1, power: 1, defense: 0 },
-  quiz: { name: 'Quiz', key: '2', kind: 'attack', cost: 2, power: 2, defense: 0 },
-  exam: { name: 'Exam', key: '3', kind: 'attack', cost: 3, power: 3, defense: 0 },
-  final: { name: 'Final', key: '4', kind: 'attack', cost: 4, power: 4, defense: 0 },
-  grandFinal: { name: 'Grand Final', key: '5', kind: 'attack', cost: 5, power: 5, defense: 0 },
-  shield: { name: 'Shield', key: 'A', kind: 'defense', cost: 0, power: 0, defense: 2 },
-  aiShield: { name: 'AI-Shield', key: 'S', kind: 'defense', cost: 1, power: 0, defense: 4 },
+  study: { key: 'Q', kind: 'study', cost: 0, power: 0, defense: 0 },
+  homework: { key: '1', kind: 'attack', cost: 1, power: 1, defense: 0 },
+  quiz: { key: '2', kind: 'attack', cost: 2, power: 2, defense: 0 },
+  exam: { key: '3', kind: 'attack', cost: 3, power: 3, defense: 0 },
+  final: { key: '4', kind: 'attack', cost: 4, power: 4, defense: 0 },
+  grandFinal: { key: '5', kind: 'attack', cost: 5, power: 5, defense: 0 },
+  shield: { key: 'A', kind: 'defense', cost: 0, power: 0, defense: 2 },
+  aiShield: { key: 'S', kind: 'defense', cost: 1, power: 0, defense: 4 },
 });
 
 export const ACTION_IDS = Object.freeze(Object.keys(ACTIONS));

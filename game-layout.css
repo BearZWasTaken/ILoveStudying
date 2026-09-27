@@ -24,7 +24,7 @@
 }
 .action-card {
   min-width: 0;
-  min-height: 104px;
+  min-height: 88px;
   padding: 10px 5px 8px;
   flex-direction: column;
   justify-content: center;
@@ -42,6 +42,19 @@
   margin-top: 2px;
 }
 .action-empty { min-width: 0; }
+.history-columns {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr;
+  gap: 10px;
+  padding: 0 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #9d8bac;
+}
+.history-player { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.history-row .history-player svg { flex: 0 0 auto; margin-right: 0; }
+.history-gpa { white-space: nowrap; }
+.history-life-loss { color: #d57682; white-space: nowrap; }
 
 @media (max-width: 760px) {
   .app-shell { padding: 0 9px; }
@@ -85,7 +98,7 @@
   #phase-label { display: none; }
   .timer-track { grid-column: 1; grid-row: 2; height: 10px; margin: 4px 0 0; }
   .current-move { grid-column: 2; grid-row: 1 / 3; justify-content: center; }
-  .current-move > span, .selected-name { display: none; }
+  .current-move > span { display: none; }
   .selected-action svg { width: 29px; height: 29px; }
   .moves-heading { display: none; }
   .action-grid {
@@ -94,18 +107,23 @@
     margin-top: 10px;
   }
   .action-card {
-    min-height: 91px;
+    min-height: 78px;
     padding: 5px 1px 3px;
     gap: 1px;
     box-shadow: 2px 2px 0 #e0e5e7;
   }
   .action-card.selected { box-shadow: 2px 2px 0 #bfabd7; }
   .action-card svg { width: 34px; height: 34px; }
-  .action-name { display: none; }
   .action-meta, .action-defense { font-size: 9px; margin-top: 2px; white-space: nowrap; }
   .keycap { top: 2px; right: 2px; font-size: 7px; padding: 2px; }
   .game-message { min-height: 13px; margin: 8px 0 0; font-size: 10px; }
   body:has(.game-screen:not(.hidden)) footer { display: none; }
+}
+
+@media (max-width: 430px) {
+  .history-columns { grid-template-columns: 42px 1fr 1fr; gap: 4px; padding: 0 10px; font-size: 6px; }
+  .history-player { gap: 3px; }
+  .history-row { font-size: 9px; }
 }
 
 @media (max-width: 380px) {

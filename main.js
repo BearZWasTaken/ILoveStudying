@@ -23,7 +23,6 @@ let match = null;
 let viewingRecord = null;
 let terminalWinner = null;
 let roundActive = false;
-let awaitingReadyRound = 0;
 let remoteCommitted = false;
 let ownName = 'Anonymous';
 let opponentName = 'Opponent';
@@ -48,11 +47,16 @@ function icon(id) {
 function actionDisplay(id) {
   const wrap = document.createElement('span');
   wrap.className = 'selected-action';
-  const name = document.createElement('span');
-  name.className = 'selected-name';
-  name.textContent = ACTIONS[id].name;
-  wrap.append(icon(id), name);
+  wrap.setAttribute('aria-label', `Selected move: ${actionEffect(id)}`);
+  wrap.append(icon(id));
   return wrap;
+}
+
+function actionEffect(id) {
+  const action = ACTIONS[id];
+  if (action.kind === 'study') return 'plus 1 GPA';
+  if (action.kind === 'attack') return `power ${action.power}, minus ${action.cost} GPA`;
+  return `defense ${action.defense}, ${action.cost ? `minus ${action.cost} GPA` : 'free'}`;
 }
 
 function resetConnection() {
@@ -65,7 +69,6 @@ function resetConnection() {
   phase = 'home';
   terminalWinner = null;
   roundActive = false;
-  awaitingReadyRound = 0;
   remoteCommitted = false;
   localReady = false;
   remoteReady = false;
@@ -318,19 +321,7 @@ function handleMessage(message) {
     settings = { roundTime, lives };
     beginMatch();
   } else if (message.type === 'round-start' && role === 'guest' && (phase === 'game' || phase === 'reveal')) {
-    if (message.round === round + 1 && !awaitingReadyRound) {
-      awaitingReadyRound = message.round;
-      showRoundSync();
-      link?.send({ type: 'round-ready', round: message.round });
-      roundTimer = setTimeout(() => finish('disconnect', null), 15000);
-    }
-  } else if (message.type === 'round-ready' && role === 'host' && message.round === awaitingReadyRound && awaitingReadyRound === round + 1) {
-    awaitingReadyRound = 0;
-    link?.send({ type: 'round-go', round: message.round });
-    beginRound();
-  } else if (message.type === 'round-go' && role === 'guest' && message.round === awaitingReadyRound && awaitingReadyRound === round + 1) {
-    awaitingReadyRound = 0;
-    beginRound();
+    if (message.round === round + 1) beginRound();
   } else if (message.type === 'round-choice' && role === 'host' && !remoteCommitted && (phase === 'game' || phase === 'reveal') && message.round === round && canUse(message.action, players[1].gpa)) {
     remoteChoice = message.action;
     remoteCommitted = true;
@@ -346,7 +337,6 @@ function beginMatch() {
   phase = 'game';
   round = 0;
   roundActive = false;
-  awaitingReadyRound = 0;
   remoteCommitted = false;
   players = [{ gpa: 0, lives: settings.lives }, { gpa: 0, lives: settings.lives }];
   match = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), settings: { ...settings }, role, roomCode, players: [ownName, opponentName], rounds: [], outcome: null, reason: null };
@@ -357,24 +347,20 @@ function beginMatch() {
   show('game-screen');
   drawStats();
   clearReveals();
-  showRoundSync();
+  showRoundWait();
   if (role === 'host') startRoundFromHost();
 }
 
 function startRoundFromHost() {
   if (phase !== 'game' && phase !== 'reveal') return;
-  clearTimeout(roundTimer);
-  roundActive = false;
-  awaitingReadyRound = round + 1;
-  showRoundSync();
   link?.send({ type: 'round-start', round: round + 1 });
-  roundTimer = setTimeout(() => finish('disconnect', null), 15000);
+  beginRound();
 }
 
-function showRoundSync() {
+function showRoundWait() {
   chosen = 'study';
   setText('round-number', `ROUND ${String(round + 1).padStart(2, '0')}`);
-  setText('phase-label', 'SYNCING ROUND...');
+  setText('phase-label', 'WAITING FOR ROUND...');
   setText('time-left', '—');
   setText('game-message', '');
   $('timer-fill').style.width = '0%';
@@ -484,7 +470,7 @@ function clearReveals() {
 function reveal(elementId, actionId, result) {
   $(elementId).replaceChildren(icon(actionId));
   $(elementId).className = `reveal-slot ${result}`;
-  $(elementId).setAttribute('aria-label', `${elementId === 'your-reveal' ? 'Your' : 'Opponent'} move: ${ACTIONS[actionId].name}`);
+  $(elementId).setAttribute('aria-label', `${elementId === 'your-reveal' ? 'Your' : 'Opponent'} move: ${actionEffect(actionId)}`);
 }
 
 function drawActions() {
@@ -505,16 +491,13 @@ function drawActions() {
     button.className = `action-card${chosen === id ? ' selected' : ''}`;
     button.setAttribute('aria-pressed', String(chosen === id));
     button.disabled = !roundActive || !canUse(id, players[0].gpa);
-    button.setAttribute('aria-label', `${action.name}, ${action.kind === 'study' ? 'plus 1 GPA' : action.cost ? `minus ${action.cost} GPA` : 'free'}, key ${action.key}`);
+    button.setAttribute('aria-label', `Key ${action.key}, ${actionEffect(id)}`);
     const info = document.createElement('span');
     info.className = 'action-info';
-    const name = document.createElement('span');
-    name.className = 'action-name';
-    name.textContent = action.name;
     const meta = document.createElement('span');
     meta.className = `action-meta ${action.kind === 'study' ? 'gain' : action.cost ? 'cost' : 'defense'}`;
     meta.textContent = action.kind === 'study' ? '+1 GPA' : action.kind === 'attack' ? `−${action.cost} GPA` : action.cost ? `−${action.cost} GPA` : `DEF ${action.defense}`;
-    info.append(name, meta);
+    info.append(meta);
     if (id === 'aiShield') {
       const defense = document.createElement('span');
       defense.className = 'action-defense';
@@ -561,7 +544,6 @@ function finish(reason, winner) {
   cancelAnimationFrame(timerFrame);
   phase = 'result';
   roundActive = false;
-  awaitingReadyRound = 0;
   remoteCommitted = false;
   match.reason = reason;
   match.outcome = winner === 0 ? 'win' : winner === 1 ? 'loss' : 'unresolved';
@@ -594,18 +576,58 @@ function renderRoundHistory(record) {
     empty.textContent = 'No completed rounds.';
     list.append(empty);
   }
+  const columns = document.createElement('div');
+  columns.className = 'history-columns';
+  for (const label of ['', 'YOU', 'OPPONENT']) {
+    const cell = document.createElement('span');
+    cell.textContent = label;
+    columns.append(cell);
+  }
+  if (record.rounds.length) list.append(columns);
+  let previousPlayers = Array.from({ length: 2 }, () => ({ gpa: 0, lives: record.settings?.lives || 1 }));
   for (const entry of record.rounds) {
+    if (!Array.isArray(entry.actions) || !entry.actions.every((id) => ACTIONS[id])) continue;
+    const before = Array.isArray(entry.before) && entry.before.length === 2 ? entry.before : previousPlayers;
+    let after = entry.after;
+    if (!Array.isArray(after) || after.length !== 2 || after.some((player) => !Number.isInteger(player?.gpa))) {
+      try { after = resolveRound(before, entry.actions).players; } catch { after = null; }
+    } else if (after.some((player) => !Number.isInteger(player.lives))) {
+      after = after.map((player, index) => {
+        const priorLives = Number.isInteger(before[index]?.lives) ? before[index].lives : 1;
+        const lost = Number.isInteger(entry.winner) && entry.winner !== index ? 1 : 0;
+        return { gpa: player.gpa, lives: Math.max(0, priorLives - lost) };
+      });
+    }
     const row = document.createElement('div');
     row.className = 'history-row';
     const number = document.createElement('span');
     number.className = 'history-round';
     number.textContent = `#${entry.round}`;
-    const you = document.createElement('span');
-    const opponent = document.createElement('span');
-    you.append(icon(entry.actions[0]), document.createTextNode(`You: ${ACTIONS[entry.actions[0]].name}`));
-    opponent.append(icon(entry.actions[1]), document.createTextNode(`Opponent: ${ACTIONS[entry.actions[1]].name}`));
-    row.append(number, you, opponent);
+    row.append(number);
+    for (let index = 0; index < 2; index += 1) {
+      const player = document.createElement('span');
+      player.className = 'history-player';
+      const move = icon(entry.actions[index]);
+      const gpa = document.createElement('span');
+      gpa.className = 'history-gpa';
+      const points = after?.[index]?.gpa;
+      gpa.textContent = `${Number.isInteger(points) ? points : '?'} GPA`;
+      const hasLives = Number.isInteger(before?.[index]?.lives) && Number.isInteger(after?.[index]?.lives);
+      const lostLife = hasLives
+        ? before[index].lives > after[index].lives
+        : Number.isInteger(entry.winner) && entry.winner !== index;
+      player.setAttribute('aria-label', `${index === 0 ? 'You' : 'Opponent'}: ${actionEffect(entry.actions[index])}, ${gpa.textContent}${lostLife ? ', lost one life' : ''}`);
+      player.append(move, gpa);
+      if (lostLife) {
+        const loss = document.createElement('span');
+        loss.className = 'history-life-loss';
+        loss.textContent = '-❤️';
+        player.append(loss);
+      }
+      row.append(player);
+    }
     list.append(row);
+    if (after) previousPlayers = after;
   }
 }
 
