@@ -10,7 +10,15 @@ A two-player, real-time browser game built as a static site. GitHub Pages can ho
 4. Both players select **Ready**. The host can change the round time and lives; changing either setting clears both ready states. Once both are ready, the host starts the match.
 5. After the match, both players can return to the same room and get ready for another game. The room code, names, and settings remain in place while the host keeps the room open.
 
-PeerJS Cloud exchanges connection information when a guest enters a room code. Moves then travel over a WebRTC data channel. PeerJS also uses a public STUN service to help establish a direct connection. The game relies on the availability of PeerJS Cloud and a CDN for the PeerJS browser library. Some restrictive networks cannot make a direct connection; this version has no TURN relay and therefore cannot guarantee connectivity everywhere.
+PeerJS Cloud exchanges connection information when a guest enters a room code. Moves then travel over a WebRTC data channel. PeerJS also uses a public STUN service to help establish a direct connection. The game relies on the availability of PeerJS Cloud and a CDN for the PeerJS browser library. Some restrictive networks cannot make a direct connection. The optional TURN configuration below can relay those connections; it is disabled by default.
+
+## Optional TURN relay
+
+TURN may help when two networks cannot connect directly, but a timeout alone does not prove that TURN is needed. The guest's connection error displays the browser's ICE state, and the host displays **Opponent found. Connecting...** when the connection request reaches it.
+
+To use a TURN provider, set `TURN_CREDENTIALS_URL` in `turn-config.js` to an HTTPS endpoint returning an `iceServers` array or `{ "iceServers": [...] }`. Each TURN entry needs `urls`, `username`, and `credential`. Both players load the same published configuration. If the endpoint fails or returns no valid TURN entries, the game uses its original STUN-only connection path. Never put permanent private TURN credentials in this public repository.
+
+[Metered Open Relay](https://www.metered.ca/tools/openrelay/) currently offers a free account with 20 GB of TURN usage per month and documents a browser-fetchable credentials endpoint. You must create your own account and set its endpoint URL; no account or key is included in this repository. Check the provider's current quota and billing settings before enabling it. GitHub Pages continues to host only the static game files.
 
 ## Rules
 

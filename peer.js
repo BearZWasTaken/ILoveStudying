@@ -1,3 +1,5 @@
+import { peerOptions } from './turn.js';
+
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PEER_PREFIX = 'ils-room-';
 
@@ -32,6 +34,7 @@ export class PeerLink {
     this.isHost = false;
     this.code = null;
     this.connectTimeout = null;
+    this.hostPendingTimeout = null;
   }
 
   peerConstructor() {
@@ -41,10 +44,11 @@ export class PeerLink {
 
   async createRoom() {
     const Peer = this.peerConstructor();
+    const options = await peerOptions();
     this.isHost = true;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const code = randomRoomCode();
-      const peer = new Peer(roomPeerId(code));
+      const peer = new Peer(roomPeerId(code), options);
       try {
         await waitForOpen(peer);
         if (this.closed) { peer.destroy(); throw new Error('Room closed.'); }
@@ -69,6 +73,7 @@ export class PeerLink {
         });
         return;
       }
+      this.onStatus('incoming');
       this.attach(channel);
     });
     this.peer.on('error', () => this.onStatus('service-error'));
@@ -78,7 +83,8 @@ export class PeerLink {
     const code = normalizeRoomCode(value);
     if (!code) throw new Error('Enter a 6-character room code.');
     const Peer = this.peerConstructor();
-    const peer = new Peer();
+    const options = await peerOptions();
+    const peer = new Peer(options);
     this.peer = peer;
     this.code = code;
     await waitForOpen(peer).catch(() => { throw new Error('Could not reach the room service. Try again.'); });
@@ -86,7 +92,9 @@ export class PeerLink {
     const channel = peer.connect(roomPeerId(code), { reliable: true, serialization: 'json' });
     this.attach(channel);
     this.connectTimeout = setTimeout(() => {
-      if (!this.connected && !this.closed) this.onStatus('connection-timeout');
+      if (!this.connected && !this.closed) {
+        this.onStatus('connection-timeout', channel.peerConnection?.iceConnectionState || 'unknown');
+      }
     }, 20000);
     peer.on('error', (error) => {
       if (error.type === 'peer-unavailable') this.onStatus('room-not-found');
@@ -96,9 +104,19 @@ export class PeerLink {
 
   attach(channel) {
     this.channel = channel;
+    if (this.isHost) {
+      clearTimeout(this.hostPendingTimeout);
+      this.hostPendingTimeout = setTimeout(() => {
+        if (!this.closed && !this.connected && this.channel === channel) {
+          this.channel = null;
+          channel.close();
+        }
+      }, 30000);
+    }
     channel.on('open', () => {
       if (this.closed) return;
       clearTimeout(this.connectTimeout);
+      clearTimeout(this.hostPendingTimeout);
       this.connected = true;
       this.onStatus('connected');
     });
@@ -107,6 +125,7 @@ export class PeerLink {
     });
     channel.on('close', () => {
       clearTimeout(this.connectTimeout);
+      clearTimeout(this.hostPendingTimeout);
       if (this.closed || this.channel !== channel) return;
       this.channel = null;
       if (this.connected) {
@@ -126,6 +145,7 @@ export class PeerLink {
   close() {
     this.closed = true;
     clearTimeout(this.connectTimeout);
+    clearTimeout(this.hostPendingTimeout);
     this.connected = false;
     this.channel?.close();
     this.peer?.destroy();
