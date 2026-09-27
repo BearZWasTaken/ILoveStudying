@@ -2,6 +2,8 @@ import { peerOptions } from './turn.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PEER_PREFIX = 'ils-room-';
+const CONNECTION_TIMEOUT_MS = 30000;
+const HOST_PENDING_TIMEOUT_MS = 45000;
 
 export function normalizeRoomCode(value) {
   const code = String(value || '').trim().toUpperCase().replace(/[\s-]/g, '');
@@ -117,7 +119,7 @@ export class PeerLink {
       if (!this.connected && !this.closed) {
         this.onStatus('connection-timeout', channel.peerConnection?.iceConnectionState || 'unknown');
       }
-    }, 20000);
+    }, CONNECTION_TIMEOUT_MS);
     peer.on('error', (error) => {
       if (error.type === 'peer-unavailable') this.onStatus('room-not-found');
       else this.onStatus('service-error');
@@ -133,7 +135,7 @@ export class PeerLink {
           this.channel = null;
           channel.close();
         }
-      }, 30000);
+      }, HOST_PENDING_TIMEOUT_MS);
     }
     channel.on('open', () => {
       if (this.closed) return;
