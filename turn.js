@@ -1,6 +1,11 @@
 import { TURN_CREDENTIALS_URL } from './turn-config.js';
 
-const DEFAULT_STUN = { urls: 'stun:stun.l.google.com:19302' };
+const DIRECT_ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+];
+
+const directOptions = () => ({ config: { iceServers: DIRECT_ICE_SERVERS, sdpSemantics: 'unified-plan' } });
 
 export function parseTurnServers(payload) {
   const servers = Array.isArray(payload) ? payload : payload?.iceServers;
@@ -14,15 +19,15 @@ export function parseTurnServers(payload) {
 }
 
 export async function peerOptions(fetchCredentials = fetch, endpoint = TURN_CREDENTIALS_URL) {
-  if (!endpoint) return undefined;
+  if (!endpoint) return directOptions();
   try {
     const response = await fetchCredentials(endpoint, { cache: 'no-store', signal: AbortSignal.timeout(3000) });
-    if (!response.ok) return undefined;
+    if (!response.ok) return directOptions();
     const turnServers = parseTurnServers(await response.json());
-    if (!turnServers.length) return undefined;
-    return { config: { iceServers: [DEFAULT_STUN, ...turnServers] } };
+    if (!turnServers.length) return directOptions();
+    return { config: { iceServers: [...DIRECT_ICE_SERVERS, ...turnServers], sdpSemantics: 'unified-plan' } };
   } catch {
     // A TURN outage must not prevent the existing direct connection path.
-    return undefined;
+    return directOptions();
   }
 }

@@ -10,7 +10,7 @@ A two-player, real-time browser game built as a static site. GitHub Pages can ho
 4. Both players select **Ready**. The host can change the round time and lives; changing either setting clears both ready states. Once both are ready, the host starts the match.
 5. After the match, both players can return to the same room and get ready for another game. The room code, names, and settings remain in place while the host keeps the room open.
 
-PeerJS Cloud exchanges connection information when a guest enters a room code. Moves then travel over a WebRTC data channel. PeerJS also uses a public STUN service to help establish a direct connection. The game relies on the availability of PeerJS Cloud and a CDN for the PeerJS browser library. Some restrictive networks cannot make a direct connection. The optional TURN configuration below can relay those connections; it is disabled by default.
+PeerJS Cloud exchanges connection information when a guest enters a room code. Moves then travel over a WebRTC data channel. The game uses Google's and Cloudflare's public STUN services to help establish a direct connection. The game relies on the availability of PeerJS Cloud and a CDN for the PeerJS browser library. Some restrictive networks cannot make a direct connection. The optional TURN configuration below can relay those connections; it is disabled by default.
 
 ## Optional TURN relay
 
