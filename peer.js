@@ -42,6 +42,21 @@ function roomServiceError(error) {
   return new Error(`Could not reach the room service (${type}). Try again.`);
 }
 
+async function connectionDiagnostics(channel) {
+  const pc = channel.peerConnection;
+  const detail = { ice: pc?.iceConnectionState || 'unknown', relay: 'unknown' };
+  if (!pc?.getStats) return detail;
+  try {
+    const stats = await pc.getStats();
+    let found = false;
+    stats.forEach((item) => {
+      if (item.type === 'local-candidate' && item.candidateType === 'relay') found = true;
+    });
+    detail.relay = found ? 'ready' : 'none';
+  } catch { /* Some browsers cannot provide ICE statistics here. */ }
+  return detail;
+}
+
 export class PeerLink {
   constructor(onMessage, onStatus) {
     this.onMessage = onMessage;
@@ -115,9 +130,10 @@ export class PeerLink {
     if (this.closed) return;
     const channel = peer.connect(roomPeerId(code), { reliable: true, serialization: 'json' });
     this.attach(channel);
-    this.connectTimeout = setTimeout(() => {
+    this.connectTimeout = setTimeout(async () => {
       if (!this.connected && !this.closed) {
-        this.onStatus('connection-timeout', channel.peerConnection?.iceConnectionState || 'unknown');
+        const detail = await connectionDiagnostics(channel);
+        if (!this.connected && !this.closed) this.onStatus('connection-timeout', detail);
       }
     }, CONNECTION_TIMEOUT_MS);
     peer.on('error', (error) => {

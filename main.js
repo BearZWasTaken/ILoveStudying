@@ -207,7 +207,7 @@ function handleStatus(status, detail) {
   }
   if (status === 'room-not-found' || status === 'service-error' || status === 'connection-timeout') {
     $('connection-message').classList.remove('success');
-    setText('connection-message', status === 'room-not-found' ? 'Room not found. Check the code.' : status === 'connection-timeout' ? `Could not connect (ICE: ${detail}). Try again.` : 'Connection service unavailable. Try again.');
+    setText('connection-message', status === 'room-not-found' ? 'Room not found. Check the code.' : status === 'connection-timeout' ? `Could not connect (ICE: ${detail.ice}; relay: ${detail.relay}). Try again.` : 'Connection service unavailable. Try again.');
     if (role === 'guest' && phase === 'lobby') {
       link?.close();
       link = null;
