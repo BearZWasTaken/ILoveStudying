@@ -2,8 +2,8 @@ import { peerOptions } from './turn.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PEER_PREFIX = 'ils-room-';
-const CONNECTION_TIMEOUT_MS = 30000;
-const HOST_PENDING_TIMEOUT_MS = 45000;
+const CONNECTION_TIMEOUT_MS = 20000;
+const HOST_PENDING_TIMEOUT_MS = 30000;
 
 export function normalizeRoomCode(value) {
   const code = String(value || '').trim().toUpperCase().replace(/[\s-]/g, '');
