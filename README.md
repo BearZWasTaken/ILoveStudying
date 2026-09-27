@@ -1,15 +1,16 @@
 # I ❤️ Studying
 
-A two-player, real-time browser game built as a static site. GitHub Pages can host the files directly. No application server, account, build step, or package install is required.
+A two-player, real-time browser game built as a static site. GitHub Pages can host the files directly. No application server, account, build step, or package install is required. Room codes use the free PeerJS Cloud signaling service to connect browsers.
 
 ## Play
 
-1. Open the site in two browsers or on two devices.
-2. One player chooses **Create room**. They send the generated invite text to the other player through any messenger.
-3. The other player chooses **Join room**, pastes the invite, chooses **Make reply**, and sends the generated reply text back.
-4. The host pastes the reply and chooses **Use reply**. Once connected, the host can change the round time and lives, then start the match.
+1. Each player may enter a name. A blank name displays as **Anonymous**.
+2. One player chooses **Create room** and shares the six-character room code.
+3. The other player chooses **Join room** and enters that code.
+4. Both players select **Ready**. The host can change the round time and lives; changing either setting clears both ready states. Once both are ready, the host starts the match.
+5. After the match, both players can return to the same room and get ready for another game. The room code, names, and settings remain in place while the host keeps the room open.
 
-The invite and reply are only needed before the match. Moves travel over a WebRTC data channel after that. The app uses a public STUN service to help establish a direct connection. Some restrictive networks cannot make a direct connection; this version has no TURN relay and therefore cannot guarantee connectivity everywhere.
+PeerJS Cloud exchanges connection information when a guest enters a room code. Moves then travel over a WebRTC data channel. PeerJS also uses a public STUN service to help establish a direct connection. The game relies on the availability of PeerJS Cloud and a CDN for the PeerJS browser library. Some restrictive networks cannot make a direct connection; this version has no TURN relay and therefore cannot guarantee connectivity everywhere.
 
 ## Rules
 
@@ -20,9 +21,9 @@ The invite and reply are only needed before the match. Moves travel over a WebRT
 - An attack beats Study, a weaker attack, or defense lower than its power. Every other pairing has no round winner. The loser loses one life.
 - Moves that cost more GPA than a player has are unavailable.
 
-The host controls round resolution. An explicit **Leave** is a loss for the leaving player. Unexpected connection loss is recorded as an unresolved match because two peers alone cannot reliably tell whose network failed.
+The host controls round resolution. An explicit **Forfeit** is a loss for that player, and the room remains open for a rematch. Unexpected connection loss is recorded as an unresolved match because two peers alone cannot reliably tell whose network failed.
 
-Each browser saves its own match history in `localStorage`, including settings, outcome, and every completed round's actions and player state. Clearing site data removes that browser's history.
+Each browser saves its own match history in `localStorage`, including player names, room code, settings, outcome, and every completed round's actions and player state. Clearing site data removes that browser's history.
 
 ## Run locally
 

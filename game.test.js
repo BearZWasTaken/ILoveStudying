@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ACTION_IDS, ACTIONS, canUse, resolveRound, roundWinner } from './game.js';
+import { normalizeRoomCode } from './peer.js';
 
 test('all eight actions and keys are present', () => {
   assert.equal(ACTION_IDS.length, 8);
@@ -28,4 +29,11 @@ test('equal attacks, adequate defense, and other pairs have no winner', () => {
   assert.equal(roundWinner('final', 'aiShield'), null);
   assert.equal(roundWinner('study', 'shield'), null);
   assert.equal(roundWinner('shield', 'aiShield'), null);
+});
+
+test('room codes accept readable six-character input', () => {
+  assert.equal(normalizeRoomCode(' ab c-234 '), 'ABC234');
+  assert.equal(normalizeRoomCode('ABC234'), 'ABC234');
+  assert.equal(normalizeRoomCode('ABO234'), null);
+  assert.equal(normalizeRoomCode('ABC23'), null);
 });

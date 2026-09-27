@@ -32,6 +32,8 @@
         <div class="eyebrow">A TINY STUDY SHOWDOWN</div>
         <h2>Ready to <span>study?</span></h2>
         <p class="hero-subtitle">Think fast. Choose wisely. Keep your GPA up.</p>
+        <label class="name-label" for="player-name">YOUR NAME</label>
+        <input id="player-name" class="name-input" type="text" maxlength="24" placeholder="Anonymous" autocomplete="nickname">
         <div class="home-actions">
           <button id="create-button" class="button primary"><span>＋</span> Create room</button>
           <button id="join-button" class="button secondary"><span>↗</span> Join room</button>
@@ -46,20 +48,17 @@
           <div class="panel connection-panel">
             <div class="panel-heading"><span class="panel-icon">⌁</span><h3>Connect</h3></div>
             <p id="connection-help" class="hint"></p>
-            <label id="outgoing-label" for="outgoing-signal" class="field-label">INVITE</label>
-            <textarea id="outgoing-signal" class="signal-box" readonly spellcheck="false"></textarea>
-            <button id="copy-button" class="button secondary compact">Copy</button>
-            <label id="incoming-label" for="incoming-signal" class="field-label">REPLY</label>
-            <textarea id="incoming-signal" class="signal-box" spellcheck="false"></textarea>
-            <button id="connect-button" class="button primary compact">Connect</button>
+            <div id="host-code-area"><div class="field-label">ROOM CODE</div><div id="room-code-display" class="room-code">······</div><button id="copy-button" class="button secondary compact">Copy code</button></div>
+            <div id="guest-code-area" class="hidden"><label for="room-code-input" class="field-label">ROOM CODE</label><input id="room-code-input" class="room-code-input" type="text" maxlength="8" placeholder="ABC234" autocomplete="off" spellcheck="false"><button id="connect-button" class="button primary compact">Join room</button></div>
             <p id="connection-message" class="message" role="status"></p>
           </div>
           <div class="panel settings-panel">
             <div class="panel-heading"><span class="panel-icon">⚙</span><h3>Room settings</h3></div>
             <div class="setting-row"><label for="round-time">Round time</label><div class="number-field"><input id="round-time" type="number" value="1.5" step="any" inputmode="decimal"><span>s</span></div></div>
             <div class="setting-row"><label for="lives-count">Lives</label><div class="number-field"><input id="lives-count" type="number" value="1" min="1" step="1" inputmode="numeric"><span>♥</span></div></div>
-            <div class="lobby-player"><span class="avatar avatar-you">★</span><span>You</span><span class="ready-dot"></span></div>
-            <div class="lobby-player"><span class="avatar avatar-rival">?</span><span>Opponent</span><span id="opponent-state" class="waiting-label">Waiting...</span></div>
+            <div class="lobby-player"><span class="avatar avatar-you">★</span><span id="lobby-your-name">Anonymous</span><span id="your-ready-state" class="waiting-label">Not ready</span></div>
+            <div class="lobby-player"><span class="avatar avatar-rival">?</span><span id="lobby-opponent-name">Opponent</span><span id="opponent-state" class="waiting-label">Waiting...</span></div>
+            <button id="ready-button" class="button secondary start-button" disabled>Ready</button>
             <button id="start-button" class="button primary start-button" disabled>Start game <span>→</span></button>
             <p id="lobby-message" class="message" role="status"></p>
           </div>
@@ -67,11 +66,11 @@
       </section>
 
       <section id="game-screen" class="screen game-screen hidden" aria-label="Game">
-        <div class="game-topline"><span id="round-number">ROUND 01</span><span id="room-role">HOST</span><button id="leave-button" class="leave-button">Leave</button></div>
+        <div class="game-topline"><span id="round-number">ROUND 01</span><span id="room-role">ROOM</span><button id="leave-button" class="leave-button">Forfeit</button></div>
         <div class="arena panel">
-          <div class="player-block"><div class="player-label"><span class="avatar avatar-you">★</span><span>YOU</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="your-gpa">0</strong> GPA</span><span id="your-lives" class="lives-stat"></span></div><div id="your-reveal" class="reveal-slot"></div></div>
+          <div class="player-block"><div class="player-label"><span class="avatar avatar-you">★</span><span id="game-your-name">YOU</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="your-gpa">0</strong> GPA</span><span id="your-lives" class="lives-stat"></span></div><div id="your-reveal" class="reveal-slot"></div></div>
           <div class="versus">VS</div>
-          <div class="player-block opponent-block"><div class="player-label"><span class="avatar avatar-rival">✿</span><span>OPPONENT</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="opponent-gpa">0</strong> GPA</span><span id="opponent-lives" class="lives-stat"></span></div><div id="opponent-reveal" class="reveal-slot"></div></div>
+          <div class="player-block opponent-block"><div class="player-label"><span class="avatar avatar-rival">✿</span><span id="game-opponent-name">OPPONENT</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="opponent-gpa">0</strong> GPA</span><span id="opponent-lives" class="lives-stat"></span></div><div id="opponent-reveal" class="reveal-slot"></div></div>
         </div>
         <div class="round-panel panel"><div class="round-header"><span id="phase-label">CHOOSE YOUR MOVE</span><span id="time-left">1.5s</span></div><div class="timer-track"><div id="timer-fill" class="timer-fill"></div></div><div class="current-move"><span>CURRENT MOVE</span><div id="selected-action" class="selected-action"></div></div></div>
         <div class="moves-heading"><span>YOUR MOVES</span><span>CLICK OR USE KEYS</span></div>
@@ -79,11 +78,12 @@
         <p id="game-message" class="game-message" role="status"></p>
       </section>
 
-      <section id="result-screen" class="screen result-screen hidden" aria-label="Result"><div class="result-sparkle" aria-hidden="true">✦</div><div class="eyebrow">GAME OVER</div><h2 id="result-title">You win!</h2><p id="result-detail"></p><div class="result-buttons"><button id="review-button" class="button secondary">Review rounds</button><button id="again-button" class="button primary">Back to home</button></div><div id="round-history" class="round-history hidden"></div></section>
+      <section id="result-screen" class="screen result-screen hidden" aria-label="Result"><div class="result-sparkle" aria-hidden="true">✦</div><div class="eyebrow">GAME OVER</div><h2 id="result-title">You win!</h2><p id="result-detail"></p><div class="result-buttons"><button id="review-button" class="button secondary">Review rounds</button><button id="again-button" class="button primary">Back to room</button></div><div id="round-history" class="round-history hidden"></div></section>
       <section id="records-screen" class="screen lobby-screen hidden" aria-label="Match history"><div class="section-heading"><button class="back-button" data-back aria-label="Back">←</button><div><div class="eyebrow">YOUR GAMES</div><h2>Match history</h2></div></div><div id="records-list"></div></section>
     </main>
     <footer>MADE FOR QUICK THINKERS <span>✦</span> TAKE A BREATH BETWEEN ROUNDS</footer>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>
