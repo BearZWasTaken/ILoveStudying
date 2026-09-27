@@ -126,6 +126,10 @@
   .history-row { font-size: 9px; }
 }
 
+.record-entry .record-card { margin-bottom: 0; }
+.record-entry .record-rounds { margin: 0 0 18px; padding: 4px 12px 10px; width: 100%; border: 2px solid #d3d8de; border-top: 0; background: #f9f7fc; }
+.record-entry .history-heading { margin-top: 14px; }
+
 @media (max-width: 380px) {
   .brand h1 { font-size: 8px; }
   .arena { grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); }

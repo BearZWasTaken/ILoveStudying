@@ -564,8 +564,7 @@ function renderResult(record) {
   $('round-history').replaceChildren();
 }
 
-function renderRoundHistory(record) {
-  const list = $('round-history');
+function renderRoundHistory(record, list) {
   list.replaceChildren();
   const heading = document.createElement('h3');
   heading.className = 'history-heading';
@@ -642,16 +641,27 @@ function renderRecords() {
     container.append(empty);
   }
   records.forEach((record) => {
+    const entry = document.createElement('div');
+    entry.className = 'record-entry';
     const button = document.createElement('button');
     button.className = 'record-card';
+    button.setAttribute('aria-expanded', 'false');
     const date = new Date(record.startedAt);
     button.textContent = `${record.outcome === 'win' ? 'WIN' : record.outcome === 'loss' ? 'LOSS' : 'UNRESOLVED'}  ·  ${record.role?.toUpperCase() || 'PLAYER'}  ·  ${Number.isNaN(date.getTime()) ? '' : date.toLocaleString()}  ·  ${record.rounds?.length || 0} rounds`;
+    const details = document.createElement('div');
+    details.className = 'round-history record-rounds hidden';
     button.addEventListener('click', () => {
-      viewingRecord = record;
-      renderResult(record);
-      show('result-screen');
+      const opening = details.classList.contains('hidden');
+      container.querySelectorAll('.record-rounds').forEach((item) => item.classList.add('hidden'));
+      container.querySelectorAll('.record-card').forEach((item) => item.setAttribute('aria-expanded', 'false'));
+      if (opening) {
+        renderRoundHistory(record, details);
+        details.classList.remove('hidden');
+        button.setAttribute('aria-expanded', 'true');
+      }
     });
-    container.append(button);
+    entry.append(button, details);
+    container.append(entry);
   });
 }
 
@@ -696,7 +706,7 @@ $('leave-button').addEventListener('click', () => {
 $('review-button').addEventListener('click', () => {
   const history = $('round-history');
   const opening = history.classList.contains('hidden');
-  if (opening && viewingRecord) renderRoundHistory(viewingRecord);
+  if (opening && viewingRecord) renderRoundHistory(viewingRecord, history);
   history.classList.toggle('hidden', !opening);
   setText('review-button', opening ? 'Hide rounds' : 'Review rounds');
 });
