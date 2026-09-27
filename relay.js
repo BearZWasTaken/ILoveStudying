@@ -1,4 +1,4 @@
-import { normalizeRoomCode } from './peer.js?v=20260927b';
+import { normalizeRoomCode } from './peer.js?v=20260928a';
 
 const RELAY_URL = 'wss://router.metapage.io/ils-room-';
 const PROTOCOL = 1;
@@ -6,6 +6,7 @@ const JOIN_TIMEOUT_MS = 6000;
 const HEARTBEAT_MS = 1200;
 const LOST_MS = 10000;
 const RECOVERY_MS = 60000;
+const IDLE_RECOVERY_MS = 15000;
 const RETRY_MS = 500;
 
 export class RelayLink {
@@ -35,6 +36,7 @@ export class RelayLink {
     this.reconnectTimer = null;
     this.recoveryTimer = null;
     this.reconnectDelay = 500;
+    this.matchActive = false;
   }
 
   async createRoom(value) {
@@ -114,16 +116,26 @@ export class RelayLink {
       this.recovering = true;
       this.reconnectDelay = 500;
       this.onStatus('reconnecting');
-      this.recoveryTimer = setTimeout(() => {
-        if (!this.recovering) return;
-        this.recovering = false;
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-        this.drop();
-      }, RECOVERY_MS);
+      this.scheduleRecoveryExpiry();
     }
     if (this.socket?.readyState === WebSocket.OPEN) this.socket.close();
     this.scheduleReconnect();
+  }
+
+  scheduleRecoveryExpiry() {
+    clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = setTimeout(() => {
+      if (!this.recovering) return;
+      this.recovering = false;
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      this.drop();
+    }, this.matchActive ? RECOVERY_MS : IDLE_RECOVERY_MS);
+  }
+
+  setMatchActive(active) {
+    this.matchActive = active === true;
+    if (!this.matchActive && this.recovering) this.scheduleRecoveryExpiry();
   }
 
   scheduleReconnect() {
@@ -244,7 +256,11 @@ export class RelayLink {
       return;
     }
     if (!this.connected) return;
-    if (Date.now() - this.lastSeen > LOST_MS) { this.startRecovery(); return; }
+    if (Date.now() - this.lastSeen > LOST_MS) {
+      if (this.socket?.readyState === WebSocket.OPEN && !this.matchActive) this.disconnectOpponent();
+      else this.startRecovery();
+      return;
+    }
     this.rawSend({ type: 'heartbeat', from: this.id, to: this.remoteId });
   }
 
@@ -278,7 +294,8 @@ export class RelayLink {
     if (this.socket?.readyState !== WebSocket.OPEN) {
       if (this.isHost || this.connected) this.startRecovery();
     } else if (this.remoteId) {
-      this.rawSend({ type: 'probe', from: this.id, to: this.remoteId });
+      if (this.connected && !this.matchActive && Date.now() - this.lastSeen > LOST_MS) this.disconnectOpponent();
+      else this.rawSend({ type: 'probe', from: this.id, to: this.remoteId });
     }
   }
 

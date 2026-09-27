@@ -4,6 +4,8 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PEER_PREFIX = 'ils-room-';
 const CONNECTION_TIMEOUT_MS = 20000;
 const HOST_PENDING_TIMEOUT_MS = 30000;
+const HEARTBEAT_MS = 1200;
+const LOST_MS = 10000;
 
 export function normalizeRoomCode(value) {
   const code = String(value || '').trim().toUpperCase().replace(/[\s-]/g, '');
@@ -69,6 +71,9 @@ export class PeerLink {
     this.code = null;
     this.connectTimeout = null;
     this.hostPendingTimeout = null;
+    this.heartbeatTimer = null;
+    this.lastSeen = 0;
+    this.matchActive = false;
   }
 
   peerConstructor() {
@@ -143,6 +148,8 @@ export class PeerLink {
   }
 
   attach(channel) {
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
     this.channel = channel;
     if (this.isHost) {
       clearTimeout(this.hostPendingTimeout);
@@ -158,15 +165,21 @@ export class PeerLink {
       clearTimeout(this.connectTimeout);
       clearTimeout(this.hostPendingTimeout);
       this.connected = true;
+      this.lastSeen = Date.now();
+      this.heartbeatTimer = setInterval(() => this.heartbeat(), HEARTBEAT_MS);
       this.onStatus('connected');
     });
     channel.on('data', (message) => {
-      if (!this.closed && this.channel === channel && message && typeof message === 'object') this.onMessage(message);
+      if (this.closed || this.channel !== channel || !message || typeof message !== 'object') return;
+      this.lastSeen = Date.now();
+      if (message.type !== 'heartbeat') this.onMessage(message);
     });
     channel.on('close', () => {
       clearTimeout(this.connectTimeout);
       clearTimeout(this.hostPendingTimeout);
       if (this.closed || this.channel !== channel) return;
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
       this.channel = null;
       if (this.connected) {
         this.connected = false;
@@ -182,12 +195,25 @@ export class PeerLink {
     return true;
   }
 
+  heartbeat() {
+    if (!this.connected) return;
+    if (!this.channel?.open) { this.disconnectOpponent(); return; }
+    if (Date.now() - this.lastSeen > (this.matchActive ? 30000 : LOST_MS)) { this.disconnectOpponent(); return; }
+    try { this.channel.send({ type: 'heartbeat' }); } catch { this.disconnectOpponent(); }
+  }
+
+  setMatchActive(active) { this.matchActive = active === true; }
+
+  wake() { this.heartbeat(); }
+
   disconnectOpponent() {
     if (!this.channel) return;
     const channel = this.channel;
     const wasConnected = this.connected;
     clearTimeout(this.connectTimeout);
     clearTimeout(this.hostPendingTimeout);
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
     this.channel = null;
     this.connected = false;
     channel.close();
@@ -198,6 +224,7 @@ export class PeerLink {
     this.closed = true;
     clearTimeout(this.connectTimeout);
     clearTimeout(this.hostPendingTimeout);
+    clearInterval(this.heartbeatTimer);
     this.connected = false;
     this.channel?.close();
     this.peer?.destroy();

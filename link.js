@@ -1,5 +1,5 @@
-import { PeerLink, normalizeRoomCode, randomRoomCode } from './peer.js?v=20260927b';
-import { RelayLink } from './relay.js?v=20260927b';
+import { PeerLink, normalizeRoomCode, randomRoomCode } from './peer.js?v=20260928a';
+import { RelayLink } from './relay.js?v=20260928a';
 
 export class RoomLink {
   constructor(onMessage, onStatus) {
@@ -96,9 +96,17 @@ export class RoomLink {
 
   disconnectOpponent() { this.active?.disconnectOpponent(); }
 
+  setMatchActive(active) { this.active?.setMatchActive(active); }
+
   get recovering() { return this.relay?.recovering === true; }
 
-  wake() { this.relay?.wake(); }
+  wake() {
+    if (this.active) this.active.wake();
+    else {
+      this.relay?.wake();
+      this.peer?.wake();
+    }
+  }
 
   close() {
     this.closed = true;

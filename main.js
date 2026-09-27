@@ -1,12 +1,13 @@
 import { ACTIONS, ACTION_IDS, canUse, resolveRound } from './game.js';
-import { RoomLink } from './link.js?v=20260927b';
+import { RoomLink } from './link.js?v=20260928a';
 
 const $ = (id) => document.getElementById(id);
 const screens = ['home-screen', 'lobby-screen', 'game-screen', 'result-screen', 'records-screen'];
 const keyActions = Object.fromEntries(ACTION_IDS.map((id) => [ACTIONS[id].key.toLowerCase(), id]));
 const HISTORY_KEY = 'i-love-studying-matches-v1';
 const HISTORY_PREFIX = 'i-love-studying-match-v2:';
-const CLIENT_PROTOCOL = 2;
+const CLIENT_PROTOCOL = 3;
+const START_TIMEOUT_MS = 15000;
 
 let link = null;
 let role = null;
@@ -30,6 +31,10 @@ let opponentName = 'Opponent';
 let localReady = false;
 let remoteReady = false;
 let roomCode = null;
+let settingsRevision = 0;
+let settingsKnown = false;
+let pendingStartId = null;
+let startTimer = 0;
 
 function show(id) {
   screens.forEach((screen) => $(screen).classList.toggle('hidden', screen !== id));
@@ -63,6 +68,7 @@ function actionEffect(id) {
 function resetConnection() {
   clearTimeout(roundTimer);
   clearTimeout(nextTimer);
+  clearTimeout(startTimer);
   cancelAnimationFrame(timerFrame);
   link?.close();
   link = null;
@@ -74,6 +80,10 @@ function resetConnection() {
   localReady = false;
   remoteReady = false;
   roomCode = null;
+  settingsRevision = 0;
+  settingsKnown = false;
+  pendingStartId = null;
+  startTimer = 0;
   $('connection-pill').classList.remove('online');
   setText('connection-pill', 'OFFLINE');
 }
@@ -91,6 +101,7 @@ function openLobby(asHost) {
   phase = 'lobby';
   show('lobby-screen');
   settings = { roundTime: 1.5, lives: 1 };
+  settingsKnown = asHost;
   $('round-time').value = '1.5';
   $('lives-count').value = '1';
   $('round-time').disabled = !asHost;
@@ -135,19 +146,20 @@ function updateReadyUi() {
   setText('opponent-state', !link?.connected ? 'Waiting...' : remoteReady ? 'Ready!' : 'Not ready');
   $('opponent-state').classList.toggle('ready-state', remoteReady && Boolean(link?.connected));
   setText('ready-button', localReady ? 'Cancel ready' : 'Ready');
-  $('ready-button').disabled = !link?.connected || phase !== 'lobby';
-  $('start-button').disabled = role !== 'host' || !link?.connected || !localReady || !remoteReady || !validSettings();
+  $('ready-button').disabled = !link?.connected || !settingsKnown || phase !== 'lobby';
+  $('start-button').disabled = role !== 'host' || !link?.connected || !settingsKnown || !localReady || !remoteReady || phase !== 'lobby' || !validSettings();
 }
 
 function resetReady(announce = false) {
   localReady = false;
   remoteReady = false;
-  if (announce) link?.send({ type: 'ready-reset' });
+  if (announce) link?.send({ type: 'ready', ready: false, revision: settingsRevision });
   updateReadyUi();
 }
 
 function clearOpponent() {
   opponentName = 'Opponent';
+  if (role === 'guest') settingsKnown = false;
   setText('lobby-opponent-name', opponentName);
   setText('game-opponent-name', opponentName);
   resetReady(false);
@@ -176,10 +188,12 @@ function updateSettings() {
     $('start-button').disabled = true;
     return;
   }
-  settings = next;
   setText('lobby-message', '');
-  resetReady(true);
-  link?.send({ type: 'settings', settings });
+  if (next.roundTime === settings.roundTime && next.lives === settings.lives) { updateReadyUi(); return; }
+  settings = next;
+  settingsRevision += 1;
+  resetReady(false);
+  link?.send({ type: 'settings', revision: settingsRevision, settings });
 }
 
 async function copyCode() {
@@ -220,7 +234,8 @@ function handleStatus(status, detail) {
     setText('connection-pill', 'RECONNECTING');
     setText('connection-message', 'Reconnecting...');
     $('connection-message').classList.remove('success');
-    if (phase === 'lobby') updateReadyUi();
+    if (phase === 'lobby' || phase === 'result') clearOpponent();
+    if (phase === 'result') updateResultNavigation();
     return;
   }
   if (status === 'resumed') {
@@ -228,7 +243,13 @@ function handleStatus(status, detail) {
     setText('connection-pill', 'CONNECTED');
     setText('connection-message', 'Connected via relay.');
     $('connection-message').classList.add('success');
-    if (phase === 'lobby') updateReadyUi();
+    if (phase === 'lobby' || phase === 'result') {
+      link?.send({ type: 'hello', name: ownName, protocol: CLIENT_PROTOCOL });
+      if (role === 'host') link?.send({ type: 'settings', revision: settingsRevision, settings });
+      else link?.send({ type: 'request-settings' });
+      updateReadyUi();
+      if (phase === 'result') updateResultNavigation();
+    }
     return;
   }
   if (status === 'room-ready') {
@@ -254,9 +275,10 @@ function handleStatus(status, detail) {
     if (role === 'guest') $('room-code-input').disabled = true;
     link?.send({ type: 'hello', name: ownName, protocol: CLIENT_PROTOCOL });
     if (role === 'host') {
-      updateSettings();
+      link?.send({ type: 'settings', revision: settingsRevision, settings });
     }
     updateReadyUi();
+    if (phase === 'result') updateResultNavigation();
     return;
   }
   if (status === 'room-not-found' || status === 'service-error' || status === 'connection-timeout') {
@@ -329,46 +351,87 @@ function handleMessage(message) {
     link?.close();
     link = null;
     $('connect-button').disabled = false;
-  } else if (message.type === 'ready' && phase === 'lobby') {
+  } else if (message.type === 'ready' && (phase === 'lobby' || phase === 'result') && settingsKnown && message.revision === settingsRevision) {
     remoteReady = message.ready === true;
     updateReadyUi();
-  } else if (message.type === 'ready-reset') {
-    resetReady(false);
   } else if (message.type === 'request-settings' && role === 'host') {
-    link?.send({ type: 'settings', settings });
+    link?.send({ type: 'settings', revision: settingsRevision, settings });
   } else if (message.type === 'settings' && role === 'guest' && phase === 'lobby') {
     const { roundTime, lives } = message.settings || {};
-    if (Number.isFinite(roundTime) && roundTime > 0 && Number.isInteger(lives) && lives >= 1) {
+    if (Number.isFinite(roundTime) && roundTime > 0 && Number.isInteger(lives) && lives >= 1 && Number.isSafeInteger(message.revision) && message.revision >= 0 && (!settingsKnown || message.revision >= settingsRevision)) {
+      const changed = !settingsKnown || message.revision !== settingsRevision || roundTime !== settings.roundTime || lives !== settings.lives;
       settings = { roundTime, lives };
+      settingsRevision = message.revision;
+      settingsKnown = true;
       $('round-time').value = String(roundTime);
       $('lives-count').value = String(lives);
-      resetReady(false);
+      if (changed) resetReady(false);
+      else updateReadyUi();
     }
-  } else if (message.type === 'start' && role === 'guest' && phase === 'lobby' && localReady && remoteReady) {
-    const { roundTime, lives } = message.settings || {};
-    if (!Number.isFinite(roundTime) || roundTime <= 0 || !Number.isInteger(lives) || lives < 1) return;
-    settings = { roundTime, lives };
-    beginMatch();
-  } else if (message.type === 'round-start' && role === 'guest' && (phase === 'game' || phase === 'reveal')) {
-    if (message.round === round + 1) beginRound();
-  } else if (message.type === 'round-choice' && role === 'host' && !remoteCommitted && (phase === 'game' || phase === 'reveal') && message.round === round && canUse(message.action, players[1].gpa)) {
+  } else if (message.type === 'start' && role === 'guest' && phase === 'lobby' && typeof message.matchId === 'string') {
+    if (!settingsKnown || !localReady || message.revision !== settingsRevision) {
+      link?.send({ type: 'start-reject', matchId: message.matchId });
+      return;
+    }
+    pendingStartId = message.matchId;
+    beginMatch(message.matchId);
+    link?.send({ type: 'start-ack', matchId: message.matchId });
+    armStartTimer(message.matchId);
+  } else if (message.type === 'start-ack' && role === 'host' && pendingStartId === message.matchId && phase === 'game' && round === 0) {
+    clearTimeout(startTimer);
+    pendingStartId = null;
+    startRoundFromHost();
+  } else if (message.type === 'start-reject' && role === 'host' && pendingStartId === message.matchId) {
+    cancelPendingStart('Could not start. Ready again.');
+    link?.send({ type: 'settings', revision: settingsRevision, settings });
+  } else if (message.type === 'start-cancel' && message.matchId === match?.id && (phase === 'game' || phase === 'reveal')) {
+    if (round === 0) cancelPendingStart('Could not start. Ready again.', false);
+    else finish('disconnect', null);
+  } else if (message.type === 'round-start' && role === 'guest' && message.matchId === match?.id && (phase === 'game' || phase === 'reveal')) {
+    if (message.round === round + 1) {
+      clearTimeout(startTimer);
+      pendingStartId = null;
+      beginRound();
+    }
+  } else if (message.type === 'round-choice' && role === 'host' && message.matchId === match?.id && !remoteCommitted && (phase === 'game' || phase === 'reveal') && message.round === round && canUse(message.action, players[1].gpa)) {
     remoteChoice = message.action;
     remoteCommitted = true;
     if (phase === 'reveal' && !roundActive) resolveAsHost();
-  } else if (message.type === 'round-result' && role === 'guest' && (phase === 'game' || phase === 'reveal') && message.round === round) {
+  } else if (message.type === 'round-result' && role === 'guest' && message.matchId === match?.id && (phase === 'game' || phase === 'reveal') && message.round === round) {
     acceptResult(message);
-  } else if (message.type === 'leave' && (phase === 'game' || phase === 'reveal')) {
+  } else if (message.type === 'leave' && message.matchId === match?.id && (phase === 'game' || phase === 'reveal')) {
     finish('opponent-left', 0);
   }
 }
 
-function beginMatch() {
+function armStartTimer(matchId) {
+  clearTimeout(startTimer);
+  startTimer = setTimeout(() => {
+    if (pendingStartId === matchId && round === 0) cancelPendingStart('Could not start. Ready again.');
+  }, START_TIMEOUT_MS);
+}
+
+function cancelPendingStart(message, announce = true) {
+  if (!pendingStartId || round !== 0 || phase !== 'game') return;
+  if (announce) link?.send({ type: 'start-cancel', matchId: pendingStartId });
+  clearTimeout(startTimer);
+  pendingStartId = null;
+  match = null;
+  link?.setMatchActive(false);
+  phase = 'lobby';
+  resetReady(true);
+  show('lobby-screen');
+  setText('lobby-message', message);
+}
+
+function beginMatch(matchId) {
   phase = 'game';
+  link?.setMatchActive(true);
   round = 0;
   roundActive = false;
   remoteCommitted = false;
   players = [{ gpa: 0, lives: settings.lives }, { gpa: 0, lives: settings.lives }];
-  match = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), settings: { ...settings }, role, roomCode, players: [ownName, opponentName], rounds: [], outcome: null, reason: null };
+  match = { id: matchId, startedAt: new Date().toISOString(), settings: { ...settings }, role, roomCode, players: [ownName, opponentName], rounds: [], outcome: null, reason: null };
   terminalWinner = null;
   setText('room-role', `ROOM ${roomCode}`);
   setText('game-your-name', ownName);
@@ -377,12 +440,11 @@ function beginMatch() {
   drawStats();
   clearReveals();
   showRoundWait();
-  if (role === 'host') startRoundFromHost();
 }
 
 function startRoundFromHost() {
   if (phase !== 'game' && phase !== 'reveal') return;
-  link?.send({ type: 'round-start', round: round + 1 });
+  link?.send({ type: 'round-start', matchId: match.id, round: round + 1 });
   beginRound();
 }
 
@@ -424,7 +486,7 @@ function beginRound() {
     if (role === 'host') {
       if (remoteCommitted) resolveAsHost();
       else roundTimer = setTimeout(() => finish('disconnect', null), 15000);
-    } else link?.send({ type: 'round-choice', round, action: chosen });
+    } else link?.send({ type: 'round-choice', matchId: match.id, round, action: chosen });
   }, settings.roundTime * 1000);
 }
 
@@ -450,7 +512,7 @@ function resolveAsHost() {
   clearTimeout(roundTimer);
   const actions = [chosen, remoteChoice];
   const result = resolveRound(players, actions);
-  link?.send({ type: 'round-result', round, actions, players: result.players, winner: result.winner });
+  link?.send({ type: 'round-result', matchId: match.id, round, actions, players: result.players, winner: result.winner });
   applyResult(actions, result.players, result.winner);
 }
 
@@ -562,7 +624,7 @@ function saveMatch() {
   if (!match) return;
   match.endedAt = new Date().toISOString();
   try {
-    localStorage.setItem(`${HISTORY_PREFIX}${match.id}`, JSON.stringify(match));
+    localStorage.setItem(`${HISTORY_PREFIX}${match.id}:${match.role}`, JSON.stringify(match));
   } catch { /* The result remains reviewable during this visit. */ }
 }
 
@@ -570,10 +632,13 @@ function finish(reason, winner) {
   if (phase !== 'game' && phase !== 'reveal') return;
   clearTimeout(roundTimer);
   clearTimeout(nextTimer);
+  clearTimeout(startTimer);
   cancelAnimationFrame(timerFrame);
   phase = 'result';
+  link?.setMatchActive(false);
   roundActive = false;
   remoteCommitted = false;
+  pendingStartId = null;
   match.reason = reason;
   match.outcome = winner === 0 ? 'win' : winner === 1 ? 'loss' : 'unresolved';
   saveMatch();
@@ -706,9 +771,9 @@ $('copy-button').addEventListener('click', copyCode);
 $('connect-button').addEventListener('click', connect);
 $('room-code-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); });
 $('ready-button').addEventListener('click', () => {
-  if (phase !== 'lobby' || !link?.connected) return;
+  if (phase !== 'lobby' || !link?.connected || !settingsKnown) return;
   localReady = !localReady;
-  link.send({ type: 'ready', ready: localReady });
+  link.send({ type: 'ready', ready: localReady, revision: settingsRevision });
   updateReadyUi();
 });
 $('round-time').addEventListener('input', updateSettings);
@@ -717,8 +782,12 @@ $('start-button').addEventListener('click', () => {
   if (role !== 'host' || !link?.connected || !localReady || !remoteReady) return;
   const current = validSettings();
   if (!current) return;
-  settings = current;
-  if (link.send({ type: 'start', settings })) beginMatch();
+  const matchId = crypto.randomUUID();
+  if (link.send({ type: 'start', matchId, revision: settingsRevision })) {
+    pendingStartId = matchId;
+    beginMatch(matchId);
+    armStartTimer(matchId);
+  }
 });
 $('again-button').addEventListener('click', () => {
   if (canReturnToRoom()) {
@@ -732,7 +801,7 @@ $('again-button').addEventListener('click', () => {
 });
 $('leave-button').addEventListener('click', () => {
   if (phase !== 'game' && phase !== 'reveal') return;
-  link?.send({ type: 'leave' });
+  link?.send({ type: 'leave', matchId: match.id });
   finish('left', 1);
 });
 $('review-button').addEventListener('click', () => {
@@ -748,7 +817,7 @@ document.addEventListener('keydown', (event) => {
   const actionId = keyActions[event.key.toLowerCase()];
   if (actionId) selectAction(actionId);
 });
-window.addEventListener('beforeunload', () => { if (phase === 'game' || phase === 'reveal') link?.send({ type: 'leave' }); });
+window.addEventListener('beforeunload', () => { if (phase === 'game' || phase === 'reveal') link?.send({ type: 'leave', matchId: match?.id }); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   if (roundActive) tick();

@@ -43,6 +43,14 @@ const replacement = channel();
 link.peer.emit('connection', replacement);
 assert.equal(link.channel, replacement);
 assert.equal(statuses.at(-1), 'incoming');
+replacement.open = true;
+replacement.send = () => {};
+replacement.emit('open');
+link.lastSeen -= 11000;
+link.heartbeat();
+assert.equal(replacement.closed, true);
+assert.equal(link.connected, false);
+assert.equal(statuses.at(-1), 'disconnected');
 
 link.close();
 console.log('Host retry check passed');
