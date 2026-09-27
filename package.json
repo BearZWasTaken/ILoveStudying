@@ -1,0 +1,8 @@
+{
+  "name": "i-love-studying",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node game.test.js"
+  }
+}

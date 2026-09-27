@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fbf8f1">
+  <title>I ❤️ Studying</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg class="icons" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-study" viewBox="0 0 32 32"><path d="M3 7h11l2 2 2-2h11v18H18l-2 2-2-2H3z" fill="#fff8d9" stroke="#415572" stroke-width="2"/><path d="M16 9v18M6 11h7M6 15h7M19 11h7M19 15h7" stroke="#7892b2" stroke-width="2"/></symbol>
+    <symbol id="icon-homework" viewBox="0 0 32 32"><path d="M7 3h14l5 5v21H7z" fill="#fff9ed" stroke="#435672" stroke-width="2"/><path d="M21 3v6h5M11 14h11M11 19h11M11 24h7" stroke="#9faec4" stroke-width="2"/><path d="m20 23 2 2 5-6" fill="none" stroke="#e48790" stroke-width="2"/></symbol>
+    <symbol id="icon-quiz" viewBox="0 0 32 32"><rect x="5" y="4" width="22" height="25" fill="#eaf8fb" stroke="#435672" stroke-width="2"/><path d="M11 12c0-6 10-6 10 0 0 3-5 3-5 7M16 23v3" fill="none" stroke="#6f91b0" stroke-width="3"/></symbol>
+    <symbol id="icon-exam" viewBox="0 0 32 32"><path d="M5 7h22v21H5z" fill="#f4ebff" stroke="#435672" stroke-width="2"/><path d="M9 3h14v7H9z" fill="#e1cbf8" stroke="#435672" stroke-width="2"/><path d="M10 15h12M10 20h12M10 25h8" stroke="#9787b4" stroke-width="2"/></symbol>
+    <symbol id="icon-final" viewBox="0 0 32 32"><path d="M7 5h18v23H7z" fill="#ffe8e3" stroke="#435672" stroke-width="2"/><path d="M11 3h10v5H11z" fill="#ffbab0" stroke="#435672" stroke-width="2"/><path d="M11 14h10M11 19h10M11 24h7" stroke="#cb8187" stroke-width="2"/><path d="m22 23 3 3 4-6" fill="none" stroke="#d95e6e" stroke-width="2"/></symbol>
+    <symbol id="icon-grandFinal" viewBox="0 0 32 32"><path d="M7 11h18v17H7z" fill="#fff1c5" stroke="#435672" stroke-width="2"/><path d="m5 9 3-6 5 5 3-6 3 6 5-5 3 6-3 4H8z" fill="#f8d779" stroke="#435672" stroke-width="2"/><path d="M11 18h10M11 23h10" stroke="#bd945a" stroke-width="2"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 32 32"><path d="M16 3 28 8v8c0 7-5 11-12 14C9 27 4 23 4 16V8z" fill="#d9f0ef" stroke="#435672" stroke-width="2"/><path d="M16 7v18M8 14h16" stroke="#75aab0" stroke-width="2"/></symbol>
+    <symbol id="icon-aiShield" viewBox="0 0 32 32"><path d="M16 3 28 8v8c0 7-5 11-12 14C9 27 4 23 4 16V8z" fill="#e8e5ff" stroke="#435672" stroke-width="2"/><path d="M11 12h10v10H11zM16 9v3M16 22v3M8 17h3M21 17h3" fill="#b5a8ef" stroke="#685d9a" stroke-width="2"/><path d="M14 16h4" stroke="#fff" stroke-width="2"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-star" aria-hidden="true">✦</span><h1>I ❤️ Studying</h1></div>
+      <span class="top-pill" id="connection-pill">OFFLINE</span>
+    </header>
+
+    <main>
+      <section id="home-screen" class="screen home-screen">
+        <div class="hero-deco deco-left" aria-hidden="true">✎</div>
+        <div class="hero-deco deco-right" aria-hidden="true">✦</div>
+        <div class="eyebrow">A TINY STUDY SHOWDOWN</div>
+        <h2>Ready to <span>study?</span></h2>
+        <p class="hero-subtitle">Think fast. Choose wisely. Keep your GPA up.</p>
+        <div class="home-actions">
+          <button id="create-button" class="button primary"><span>＋</span> Create room</button>
+          <button id="join-button" class="button secondary"><span>↗</span> Join room</button>
+        </div>
+        <button id="history-button" class="home-history">Match history</button>
+        <div class="hero-note"><span class="tiny-square"></span> 1 VS 1 <span class="dot">·</span> REAL TIME</div>
+      </section>
+
+      <section id="lobby-screen" class="screen lobby-screen hidden" aria-label="Room">
+        <div class="section-heading"><button class="back-button" data-back aria-label="Back">←</button><div><div class="eyebrow">BEFORE THE BELL</div><h2 id="lobby-title">Your room</h2></div></div>
+        <div class="lobby-grid">
+          <div class="panel connection-panel">
+            <div class="panel-heading"><span class="panel-icon">⌁</span><h3>Connect</h3></div>
+            <p id="connection-help" class="hint"></p>
+            <label id="outgoing-label" for="outgoing-signal" class="field-label">INVITE</label>
+            <textarea id="outgoing-signal" class="signal-box" readonly spellcheck="false"></textarea>
+            <button id="copy-button" class="button secondary compact">Copy</button>
+            <label id="incoming-label" for="incoming-signal" class="field-label">REPLY</label>
+            <textarea id="incoming-signal" class="signal-box" spellcheck="false"></textarea>
+            <button id="connect-button" class="button primary compact">Connect</button>
+            <p id="connection-message" class="message" role="status"></p>
+          </div>
+          <div class="panel settings-panel">
+            <div class="panel-heading"><span class="panel-icon">⚙</span><h3>Room settings</h3></div>
+            <div class="setting-row"><label for="round-time">Round time</label><div class="number-field"><input id="round-time" type="number" value="1.5" step="any" inputmode="decimal"><span>s</span></div></div>
+            <div class="setting-row"><label for="lives-count">Lives</label><div class="number-field"><input id="lives-count" type="number" value="1" min="1" step="1" inputmode="numeric"><span>♥</span></div></div>
+            <div class="lobby-player"><span class="avatar avatar-you">★</span><span>You</span><span class="ready-dot"></span></div>
+            <div class="lobby-player"><span class="avatar avatar-rival">?</span><span>Opponent</span><span id="opponent-state" class="waiting-label">Waiting...</span></div>
+            <button id="start-button" class="button primary start-button" disabled>Start game <span>→</span></button>
+            <p id="lobby-message" class="message" role="status"></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="game-screen" class="screen game-screen hidden" aria-label="Game">
+        <div class="game-topline"><span id="round-number">ROUND 01</span><span id="room-role">HOST</span><button id="leave-button" class="leave-button">Leave</button></div>
+        <div class="arena panel">
+          <div class="player-block"><div class="player-label"><span class="avatar avatar-you">★</span><span>YOU</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="your-gpa">0</strong> GPA</span><span id="your-lives" class="lives-stat"></span></div><div id="your-reveal" class="reveal-slot"></div></div>
+          <div class="versus">VS</div>
+          <div class="player-block opponent-block"><div class="player-label"><span class="avatar avatar-rival">✿</span><span>OPPONENT</span></div><div class="player-stats"><span class="gpa-stat"><span class="stat-icon">✦</span> <strong id="opponent-gpa">0</strong> GPA</span><span id="opponent-lives" class="lives-stat"></span></div><div id="opponent-reveal" class="reveal-slot"></div></div>
+        </div>
+        <div class="round-panel panel"><div class="round-header"><span id="phase-label">CHOOSE YOUR MOVE</span><span id="time-left">1.5s</span></div><div class="timer-track"><div id="timer-fill" class="timer-fill"></div></div><div class="current-move"><span>CURRENT MOVE</span><div id="selected-action" class="selected-action"></div></div></div>
+        <div class="moves-heading"><span>YOUR MOVES</span><span>CLICK OR USE KEYS</span></div>
+        <div id="action-grid" class="action-grid"></div>
+        <p id="game-message" class="game-message" role="status"></p>
+      </section>
+
+      <section id="result-screen" class="screen result-screen hidden" aria-label="Result"><div class="result-sparkle" aria-hidden="true">✦</div><div class="eyebrow">GAME OVER</div><h2 id="result-title">You win!</h2><p id="result-detail"></p><div class="result-buttons"><button id="review-button" class="button secondary">Review rounds</button><button id="again-button" class="button primary">Back to home</button></div><div id="round-history" class="round-history hidden"></div></section>
+      <section id="records-screen" class="screen lobby-screen hidden" aria-label="Match history"><div class="section-heading"><button class="back-button" data-back aria-label="Back">←</button><div><div class="eyebrow">YOUR GAMES</div><h2>Match history</h2></div></div><div id="records-list"></div></section>
+    </main>
+    <footer>MADE FOR QUICK THINKERS <span>✦</span> TAKE A BREATH BETWEEN ROUNDS</footer>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
