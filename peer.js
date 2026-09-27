@@ -17,10 +17,27 @@ function roomPeerId(code) { return `${PEER_PREFIX}${code.toLowerCase()}`; }
 
 function waitForOpen(peer) {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timed out')), 10000);
-    peer.once('open', () => { clearTimeout(timeout); resolve(); });
-    peer.once('error', (error) => { clearTimeout(timeout); reject(error); });
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      peer.off('open', onOpen);
+      peer.off('error', onError);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onOpen = () => finish();
+    const onError = (error) => finish(error);
+    const timeout = setTimeout(() => finish(Object.assign(new Error('Timed out'), { type: 'timeout' })), 20000);
+    peer.on('open', onOpen);
+    peer.on('error', onError);
   });
+}
+
+function roomServiceError(error) {
+  const type = typeof error?.type === 'string' ? error.type : 'unknown';
+  return new Error(`Could not reach the room service (${type}). Try again.`);
 }
 
 export class PeerLink {
@@ -58,7 +75,7 @@ export class PeerLink {
         return code;
       } catch (error) {
         peer.destroy();
-        if (error.type !== 'unavailable-id') throw new Error('Could not create room. Check your connection and try again.');
+        if (error.type !== 'unavailable-id') throw roomServiceError(error);
       }
     }
     throw new Error('Could not find a free room code. Try again.');
@@ -92,7 +109,7 @@ export class PeerLink {
     const peer = new Peer(options);
     this.peer = peer;
     this.code = code;
-    await waitForOpen(peer).catch(() => { throw new Error('Could not reach the room service. Try again.'); });
+    await waitForOpen(peer).catch((error) => { throw roomServiceError(error); });
     if (this.closed) return;
     const channel = peer.connect(roomPeerId(code), { reliable: true, serialization: 'json' });
     this.attach(channel);
