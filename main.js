@@ -1,11 +1,12 @@
 import { ACTIONS, ACTION_IDS, canUse, resolveRound } from './game.js';
-import { RoomLink } from './link.js';
+import { RoomLink } from './link.js?v=20260927b';
 
 const $ = (id) => document.getElementById(id);
 const screens = ['home-screen', 'lobby-screen', 'game-screen', 'result-screen', 'records-screen'];
 const keyActions = Object.fromEntries(ACTION_IDS.map((id) => [ACTIONS[id].key.toLowerCase(), id]));
 const HISTORY_KEY = 'i-love-studying-matches-v1';
 const HISTORY_PREFIX = 'i-love-studying-match-v2:';
+const CLIENT_PROTOCOL = 2;
 
 let link = null;
 let role = null;
@@ -145,6 +146,21 @@ function resetReady(announce = false) {
   updateReadyUi();
 }
 
+function clearOpponent() {
+  opponentName = 'Opponent';
+  setText('lobby-opponent-name', opponentName);
+  setText('game-opponent-name', opponentName);
+  resetReady(false);
+}
+
+function canReturnToRoom() {
+  return Boolean(link && (role === 'host' || link.connected));
+}
+
+function updateResultNavigation() {
+  setText('again-button', canReturnToRoom() ? 'Back to room' : 'Back to home');
+}
+
 function validSettings() {
   const roundTime = Number($('round-time').value);
   const lives = Number($('lives-count').value);
@@ -218,6 +234,8 @@ function handleStatus(status, detail) {
   if (status === 'room-ready') {
     setText('connection-pill', 'OFFLINE');
     setText('connection-message', 'Room ready. Waiting for opponent.');
+    if (phase === 'lobby' || phase === 'result') clearOpponent();
+    if (phase === 'result') updateResultNavigation();
     return;
   }
   if (status === 'fallback') {
@@ -234,7 +252,7 @@ function handleStatus(status, detail) {
     setText('connection-message', detail === 'relay' ? 'Connected via relay.' : 'Connected directly.');
     $('connection-message').classList.add('success');
     if (role === 'guest') $('room-code-input').disabled = true;
-    link?.send({ type: 'hello', name: ownName });
+    link?.send({ type: 'hello', name: ownName, protocol: CLIENT_PROTOCOL });
     if (role === 'host') {
       updateSettings();
     }
@@ -254,7 +272,8 @@ function handleStatus(status, detail) {
   if (phase === 'result') {
     $('connection-pill').classList.remove('online');
     setText('connection-pill', 'OFFLINE');
-    resetReady(false);
+    clearOpponent();
+    updateResultNavigation();
     if (role === 'guest') {
       $('room-code-input').disabled = false;
       $('connect-button').disabled = false;
@@ -267,10 +286,10 @@ function handleStatus(status, detail) {
     if (terminalWinner !== null) finish('lives', terminalWinner);
     else if (status === 'left') finish('opponent-left', 0);
     else finish('disconnect', null);
+    clearOpponent();
+    updateResultNavigation();
   } else if (phase === 'lobby') {
-    opponentName = 'Opponent';
-    setText('lobby-opponent-name', opponentName);
-    resetReady(false);
+    clearOpponent();
     const message = status === 'left'
       ? (role === 'host' ? 'Opponent left. Room is still open.' : 'Host left the room.')
       : (role === 'host' ? 'Connection lost. Room is still open.' : 'Connection lost. Rejoin with the same code.');
@@ -292,6 +311,16 @@ function handleStatus(status, detail) {
 function handleMessage(message) {
   if (!message || typeof message !== 'object') return;
   if (message.type === 'hello' && typeof message.name === 'string') {
+    if (message.protocol !== CLIENT_PROTOCOL) {
+      if (role === 'host') link?.disconnectOpponent();
+      else { link?.close(); link = null; $('room-code-input').disabled = false; $('connect-button').disabled = false; }
+      clearOpponent();
+      $('connection-pill').classList.remove('online');
+      setText('connection-pill', 'OFFLINE');
+      setText('connection-message', 'Game updated. Refresh both pages.');
+      $('connection-message').classList.remove('success');
+      return;
+    }
     opponentName = message.name.trim().slice(0, 24) || 'Anonymous';
     setText('lobby-opponent-name', opponentName);
     setText('game-opponent-name', opponentName);
@@ -549,6 +578,10 @@ function finish(reason, winner) {
   match.outcome = winner === 0 ? 'win' : winner === 1 ? 'loss' : 'unresolved';
   saveMatch();
   resetReady(true);
+  if (reason === 'disconnect') {
+    if (link?.connected) link.disconnectOpponent();
+    clearOpponent();
+  }
   viewingRecord = match;
   renderResult(match);
   show('result-screen');
@@ -558,7 +591,7 @@ function renderResult(record) {
   const outcome = record.outcome;
   setText('result-title', outcome === 'win' ? 'You win!' : outcome === 'loss' ? 'You lose!' : 'Disconnected');
   setText('result-detail', record.reason === 'lives' ? 'No lives left.' : record.reason === 'opponent-left' ? 'Opponent left the game.' : record.reason === 'left' ? 'You left the game.' : 'Connection lost. Result unresolved.');
-  setText('again-button', link && viewingRecord === match ? 'Back to room' : 'Back to history');
+  updateResultNavigation();
   $('round-history').classList.add('hidden');
   setText('review-button', 'Review rounds');
   $('round-history').replaceChildren();
@@ -688,14 +721,13 @@ $('start-button').addEventListener('click', () => {
   if (link.send({ type: 'start', settings })) beginMatch();
 });
 $('again-button').addEventListener('click', () => {
-  if (link && viewingRecord === match) {
+  if (canReturnToRoom()) {
     phase = 'lobby';
     show('lobby-screen');
     updateReadyUi();
     if (role === 'guest') link.send({ type: 'request-settings' });
   } else {
-    renderRecords();
-    show('records-screen');
+    goHome();
   }
 });
 $('leave-button').addEventListener('click', () => {

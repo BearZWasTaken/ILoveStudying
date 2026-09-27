@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { RoomLink } from './link.js';
-import { PeerLink } from './peer.js';
-import { RelayLink } from './relay.js';
+import { PeerLink } from './peer.js?v=20260927b';
+import { RelayLink } from './relay.js?v=20260927b';
 
 const relayCreate = RelayLink.prototype.createRoom;
 const relayJoin = RelayLink.prototype.joinRoom;

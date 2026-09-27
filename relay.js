@@ -1,4 +1,4 @@
-import { normalizeRoomCode } from './peer.js';
+import { normalizeRoomCode } from './peer.js?v=20260927b';
 
 const RELAY_URL = 'wss://router.metapage.io/ils-room-';
 const PROTOCOL = 1;
@@ -209,7 +209,8 @@ export class RelayLink {
     if (!this.remoteId || message.from !== this.remoteId || message.to !== this.id) return;
     this.lastSeen = Date.now();
     if (message.type === 'bye') {
-      this.drop('left');
+      this.drop(message.reason === 'disconnect' ? 'disconnected' : 'left');
+      if (!this.isHost && message.reason === 'disconnect') this.close();
       return;
     }
     this.finishRecovery();
@@ -294,6 +295,12 @@ export class RelayLink {
     this.pending.clear();
     this.received.clear();
     if (wasConnected) this.onStatus(status);
+  }
+
+  disconnectOpponent() {
+    if (!this.connected || !this.remoteId) return;
+    this.rawSend({ type: 'bye', from: this.id, to: this.remoteId, reason: 'disconnect' });
+    this.drop();
   }
 
   clearJoin() {

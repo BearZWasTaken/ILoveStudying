@@ -154,14 +154,14 @@ export class PeerLink {
       }, HOST_PENDING_TIMEOUT_MS);
     }
     channel.on('open', () => {
-      if (this.closed) return;
+      if (this.closed || this.channel !== channel) return;
       clearTimeout(this.connectTimeout);
       clearTimeout(this.hostPendingTimeout);
       this.connected = true;
       this.onStatus('connected');
     });
     channel.on('data', (message) => {
-      if (!this.closed && message && typeof message === 'object') this.onMessage(message);
+      if (!this.closed && this.channel === channel && message && typeof message === 'object') this.onMessage(message);
     });
     channel.on('close', () => {
       clearTimeout(this.connectTimeout);
@@ -173,13 +173,25 @@ export class PeerLink {
         this.onStatus('disconnected');
       }
     });
-    channel.on('error', () => this.onStatus('service-error'));
+    channel.on('error', () => { if (!this.closed && this.channel === channel) this.onStatus('service-error'); });
   }
 
   send(message) {
     if (!this.channel?.open) return false;
     this.channel.send(message);
     return true;
+  }
+
+  disconnectOpponent() {
+    if (!this.channel) return;
+    const channel = this.channel;
+    const wasConnected = this.connected;
+    clearTimeout(this.connectTimeout);
+    clearTimeout(this.hostPendingTimeout);
+    this.channel = null;
+    this.connected = false;
+    channel.close();
+    if (wasConnected) this.onStatus('disconnected');
   }
 
   close() {
