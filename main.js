@@ -655,7 +655,8 @@ function finish(reason, winner) {
 function renderResult(record) {
   const outcome = record.outcome;
   setText('result-title', outcome === 'win' ? 'You win!' : outcome === 'loss' ? 'You lose!' : 'Disconnected');
-  setText('result-detail', record.reason === 'lives' ? 'No lives left.' : record.reason === 'opponent-left' ? 'Opponent left the game.' : record.reason === 'left' ? 'You left the game.' : 'Connection lost. Result unresolved.');
+  setText('result-detail', record.reason === 'lives' ? '' : record.reason === 'opponent-left' ? 'Opponent left the game.' : record.reason === 'left' ? 'You left the game.' : 'Connection lost. Result unresolved.');
+  $('result-detail').classList.toggle('hidden', record.reason === 'lives');
   updateResultNavigation();
   $('round-history').classList.add('hidden');
   setText('review-button', 'Review rounds');
